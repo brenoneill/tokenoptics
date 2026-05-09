@@ -10,6 +10,7 @@ import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageShell";
 import { ConversationsBrowser } from "@/components/conversation/ConversationsBrowser";
+import { ConversationsPageSkeleton } from "@/components/conversation/ConversationsPageSkeleton";
 import { analysisKey } from "@/lib/labeling/keys";
 import { formatUSD } from "@/lib/pricing";
 import {
@@ -61,7 +62,7 @@ export default function ConversationsPage() {
     return (
       <div>
         <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Conversations" }]} />
-        <PageHeader title="Conversations" description="Loading…" />
+        <ConversationsPageSkeleton />
       </div>
     );
   }

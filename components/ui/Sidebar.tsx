@@ -9,6 +9,7 @@ import {
 } from "@heroicons/react/24/outline";
 import type { ComponentType, SVGProps } from "react";
 
+import { LikeCTA } from "./LikeCTA";
 import { LogoMark } from "./LogoMark";
 
 interface NavItem {
@@ -43,29 +44,34 @@ export function Sidebar() {
         </div>
       </Link>
 
-      <nav className="flex-1 px-2 py-3">
-        {NAV.map((item) => {
-          const active =
-            pathname === item.href || pathname?.startsWith(`${item.href}/`);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`group mb-0.5 flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
-                active
-                  ? "bg-bg-emphasis text-fg"
-                  : "text-fg-muted hover:bg-bg-hover hover:text-fg"
-              }`}
-            >
-              <Icon
-                className={`h-4 w-4 ${active ? "text-accent" : "text-fg-subtle group-hover:text-fg-muted"}`}
-                aria-hidden
-              />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
+      <nav className="flex flex-1 flex-col px-2 py-3">
+        <div className="flex-1">
+          {NAV.map((item) => {
+            const active =
+              pathname === item.href || pathname?.startsWith(`${item.href}/`);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`group mb-0.5 flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
+                  active
+                    ? "bg-bg-emphasis text-fg"
+                    : "text-fg-muted hover:bg-bg-hover hover:text-fg"
+                }`}
+              >
+                <Icon
+                  className={`h-4 w-4 ${active ? "text-accent" : "text-fg-subtle group-hover:text-fg-muted"}`}
+                  aria-hidden
+                />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+        <div className="px-1 pt-3">
+          <LikeCTA />
+        </div>
       </nav>
 
       <div className="border-t border-border px-4 py-3">

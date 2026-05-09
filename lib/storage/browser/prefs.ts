@@ -19,3 +19,16 @@ export interface EarlyAccessSignupPref {
 }
 
 export const EARLY_ACCESS_BYOK_KEY = "earlyAccess.byokAiLabeling";
+
+export interface LikePref {
+  likedAt: string;
+}
+
+export const LIKE_KEY = "feedback.like";
+
+export interface UpdatesSignupPref {
+  email: string;
+  signedUpAt: string;
+}
+
+export const UPDATES_SIGNUP_KEY = "feedback.updatesSignup";

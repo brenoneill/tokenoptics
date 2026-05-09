@@ -1,6 +1,13 @@
 import type { ReactNode } from "react";
 
-type Variant = "neutral" | "accent" | "success" | "warn" | "danger" | "violet";
+type Variant =
+  | "neutral"
+  | "accent"
+  | "success"
+  | "warn"
+  | "danger"
+  | "violet"
+  | "sky";
 
 const VARIANTS: Record<Variant, string> = {
   neutral: "border-border bg-bg-emphasis text-fg-muted",
@@ -9,6 +16,7 @@ const VARIANTS: Record<Variant, string> = {
   warn:    "border-warn/30 bg-warn-subtle text-warn",
   danger:  "border-danger/30 bg-danger-subtle text-danger",
   violet:  "border-violet/30 bg-violet-subtle text-violet",
+  sky:     "border-sky/30 bg-sky-subtle text-sky",
 };
 
 interface BadgeProps {

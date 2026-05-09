@@ -13,9 +13,24 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://tokenoptics.vercel.app"),
   title: "Tokenoptics",
   description:
     "Transparency for Claude Code spend — see token, cost, and waste across your conversations.",
+  openGraph: {
+    title: "Tokenoptics",
+    description:
+      "Transparency for Claude Code spend — see token, cost, and waste across your conversations.",
+    url: "/",
+    siteName: "Tokenoptics",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Tokenoptics",
+    description:
+      "Transparency for Claude Code spend — see token, cost, and waste across your conversations.",
+  },
 };
 
 export default function RootLayout({

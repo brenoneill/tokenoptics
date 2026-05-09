@@ -2,6 +2,7 @@ import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { PageHeader } from "@/components/ui/PageShell";
 import { ChunkDisplayToggles } from "@/components/settings/ChunkDisplayToggles";
 import { ComparisonCanvasToggle } from "@/components/settings/ComparisonCanvasToggle";
+import { MinConversationCostSetting } from "@/components/settings/MinConversationCostSetting";
 import { ModelComparisonToggle } from "@/components/settings/ModelComparisonToggle";
 
 export default function SettingsPage() {
@@ -18,6 +19,12 @@ export default function SettingsPage() {
         </h2>
         <ChunkDisplayToggles />
         <ModelComparisonToggle />
+      </section>
+      <section className="space-y-3">
+        <h2 className="text-xs font-medium uppercase tracking-wider text-fg-subtle">
+          Conversations
+        </h2>
+        <MinConversationCostSetting />
       </section>
       <section className="space-y-3">
         <h2 className="text-xs font-medium uppercase tracking-wider text-fg-subtle">

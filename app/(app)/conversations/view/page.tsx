@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { PageHeader } from "@/components/ui/PageShell";
 import { StickyHeader } from "@/components/ui/StickyHeader";
+import { ConversationDetailSkeleton } from "@/components/conversation/ConversationDetailSkeleton";
 import { ConversationView } from "@/components/conversation/ConversationView";
 import { claudeCodeHarness } from "@/lib/harnesses/claudeCode";
 import type { Chunk } from "@/lib/labeling/types";
@@ -103,7 +104,7 @@ function ConversationDetail() {
     return (
       <div>
         {breadcrumb}
-        <PageHeader title="Loading…" />
+        <ConversationDetailSkeleton />
       </div>
     );
   }

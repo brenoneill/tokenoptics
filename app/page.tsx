@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { LandingContent } from "@/components/landing/LandingContent";
@@ -8,17 +8,21 @@ import { getMounts } from "@/lib/storage/browser";
 
 export default function Home() {
   const router = useRouter();
+  const [showLanding, setShowLanding] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const mounts = await getMounts();
-        if (!cancelled && mounts.length > 0) {
+        if (cancelled) return;
+        if (mounts.length > 0) {
           router.replace("/conversations");
+        } else {
+          setShowLanding(true);
         }
       } catch {
-        // If the IndexedDB check fails, fall back to showing the landing.
+        if (!cancelled) setShowLanding(true);
       }
     })();
     return () => {
@@ -26,5 +30,6 @@ export default function Home() {
     };
   }, [router]);
 
+  if (!showLanding) return <div className="min-h-screen bg-bg" />;
   return <LandingContent />;
 }

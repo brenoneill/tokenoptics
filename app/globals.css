@@ -30,6 +30,9 @@
 
   --color-violet: #a371f7;
   --color-violet-subtle: rgba(163, 113, 247, 0.15);
+
+  --color-sky: #58a6ff;
+  --color-sky-subtle: rgba(88, 166, 255, 0.15);
 }
 
 @theme inline {
@@ -60,6 +63,9 @@
 
   --color-violet: var(--color-violet);
   --color-violet-subtle: var(--color-violet-subtle);
+
+  --color-sky: var(--color-sky);
+  --color-sky-subtle: var(--color-sky-subtle);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);

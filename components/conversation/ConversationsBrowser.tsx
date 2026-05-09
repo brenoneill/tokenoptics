@@ -2,24 +2,41 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
+import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import {
   MagnifyingGlassIcon,
   FolderOpenIcon,
   SparklesIcon,
+  ChevronDownIcon,
+  CheckIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 
 import { ComparisonCanvasChip } from "@/components/conversation/ComparisonCanvasChip";
 import { ConversationCard } from "@/components/conversation/ConversationCard";
+import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import { Select, type SelectOption } from "@/components/ui/Select";
 import { projectLabel } from "@/lib/conversation";
 import { formatTokens, formatUSD } from "@/lib/pricing";
+import {
+  setMinConversationCost,
+  useMinConversationCost,
+} from "@/lib/preferences/minConversationCost";
 import type { ConversationSummary } from "@/lib/types";
 
 const ALL_PROJECTS = "__all__";
 const ALL_BRANCHES = "__all__";
 const NO_BRANCH = "__none__";
+
+type SortKey = "recent" | "cost-desc" | "cost-asc";
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "recent", label: "Recent" },
+  { value: "cost-desc", label: "Cost (high to low)" },
+  { value: "cost-asc", label: "Cost (low to high)" },
+];
 
 export interface ConversationEntry {
   conversation: ConversationSummary;
@@ -41,6 +58,8 @@ export function ConversationsBrowser({ entries, header }: Props) {
   const [project, setProject] = useState<string>(ALL_PROJECTS);
   const [branch, setBranch] = useState<string>(ALL_BRANCHES);
   const [labelledOnly, setLabelledOnly] = useState(false);
+  const [sort, setSort] = useState<SortKey>("recent");
+  const minCost = useMinConversationCost();
 
   const projectOptions = useMemo<SelectOption[]>(() => {
     const counts = new Map<string, number>();
@@ -90,11 +109,12 @@ export function ConversationsBrowser({ entries, header }: Props) {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return entries.filter((e) => {
+    const matches = entries.filter((e) => {
       const c = e.conversation;
       if (project !== ALL_PROJECTS && projectLabel(c) !== project) return false;
       if (branch !== ALL_BRANCHES && branchKey(c) !== branch) return false;
       if (labelledOnly && !e.hasChunks) return false;
+      if (minCost !== null && c.totalCost < minCost) return false;
       if (!q) return true;
       return [
         c.title,
@@ -107,7 +127,14 @@ export function ConversationsBrowser({ entries, header }: Props) {
         .toLowerCase()
         .includes(q);
     });
-  }, [entries, query, project, branch, labelledOnly]);
+    if (sort === "recent") return matches;
+    const sorted = matches.slice();
+    sorted.sort((a, b) => {
+      const diff = a.conversation.totalCost - b.conversation.totalCost;
+      return sort === "cost-desc" ? -diff : diff;
+    });
+    return sorted;
+  }, [entries, query, project, branch, labelledOnly, minCost, sort]);
 
   const totals = useMemo(() => {
     let cost = 0;
@@ -132,7 +159,7 @@ export function ConversationsBrowser({ entries, header }: Props) {
       <div className="sticky top-0 z-20 bg-bg pt-4 pb-4">
         {header}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="max-w-md flex-1">
+          <div className="flex-1">
             <Input
               icon={MagnifyingGlassIcon}
               placeholder="Search conversations…"
@@ -154,11 +181,11 @@ export function ConversationsBrowser({ entries, header }: Props) {
             value={branch}
             onChange={(e) => setBranch(e.target.value)}
             aria-label="Filter by branch"
-            disabled={branchOptions.length <= 1}
+            disabled={project === ALL_PROJECTS || branchOptions.length <= 1}
             options={branchOptions}
           />
         </div>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setLabelledOnly((v) => !v)}
@@ -172,6 +199,54 @@ export function ConversationsBrowser({ entries, header }: Props) {
             <SparklesIcon className="h-3.5 w-3.5" aria-hidden />
             Labeled
           </button>
+          {minCost !== null ? (
+            <Badge variant="sky" className="pr-1" mono>
+              Min cost {formatUSD(minCost)}
+              <button
+                type="button"
+                onClick={() => setMinConversationCost(null)}
+                aria-label="Clear minimum cost filter"
+                className="-mr-0.5 ml-1 rounded-full p-0.5 transition-colors hover:bg-sky/20"
+              >
+                <XMarkIcon className="h-3 w-3" aria-hidden />
+              </button>
+            </Badge>
+          ) : null}
+          <Menu as="div" className="relative ml-auto">
+            <MenuButton
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-bg-emphasis px-2.5 py-0.5 text-xs text-fg-muted transition-colors hover:bg-bg-subtle data-[open]:bg-bg-subtle"
+              aria-label="Sort conversations"
+            >
+              <span className="text-fg-subtle">Sort:</span>
+              <span className="text-fg">
+                {SORT_OPTIONS.find((o) => o.value === sort)?.label ?? "Recent"}
+              </span>
+              <ChevronDownIcon className="h-3.5 w-3.5" aria-hidden />
+            </MenuButton>
+            <MenuItems
+              anchor="bottom start"
+              className="z-40 mt-1 min-w-[12rem] rounded-md border border-border bg-bg shadow-lg outline-none"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <MenuItem key={opt.value}>
+                  {({ focus }) => (
+                    <button
+                      type="button"
+                      onClick={() => setSort(opt.value)}
+                      className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm ${
+                        focus ? "bg-bg-emphasis text-fg" : "text-fg-muted"
+                      }`}
+                    >
+                      <span>{opt.label}</span>
+                      {sort === opt.value ? (
+                        <CheckIcon className="h-4 w-4 text-accent" aria-hidden />
+                      ) : null}
+                    </button>
+                  )}
+                </MenuItem>
+              ))}
+            </MenuItems>
+          </Menu>
         </div>
       </div>
 

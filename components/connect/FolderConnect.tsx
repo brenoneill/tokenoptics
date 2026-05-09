@@ -348,7 +348,33 @@ export function FolderConnect() {
         <EmptyState
           icon={FolderOpenIcon}
           title="No folders connected"
-          description="Connect a Claude Code projects folder (typically ~/.claude/projects) to start indexing your conversations."
+          description={
+            <>
+              Connect a Claude Code projects folder (typically{" "}
+              <span className="font-mono">~/.claude/projects</span>) to start
+              indexing your conversations. See{" "}
+              <strong>How to connect</strong> below for the fastest way to find
+              it.
+            </>
+          }
+          action={
+            <button
+              type="button"
+              disabled={busy === "claude-code"}
+              onClick={() => void connectHarness("claude-code")}
+              aria-busy={busy === "claude-code"}
+              className="inline-flex items-center gap-2 rounded-md border border-accent bg-accent px-4 py-2 text-sm font-medium text-bg hover:opacity-90 disabled:cursor-wait disabled:opacity-80"
+            >
+              {busy === "claude-code" ? (
+                <ArrowPathIcon className="h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                <FolderOpenIcon className="h-4 w-4" aria-hidden />
+              )}
+              {busy === "claude-code"
+                ? "Connecting Claude Code…"
+                : "Connect Claude Code Folder"}
+            </button>
+          }
         />
       ) : (
         <div className="space-y-3">
@@ -421,8 +447,9 @@ export function FolderConnect() {
             by the OS. The fastest way to select it:
             <ol className="mt-2 space-y-1.5 text-fg">
               <li>
-                <strong>1.</strong> Click <strong>Connect Claude Code</strong>{" "}
-                below to open the folder picker.
+                <strong>1.</strong> Click{" "}
+                <strong>Connect Claude Code Folder</strong> to open the folder
+                picker.
               </li>
               {os === "windows" ? (
                 <>
@@ -481,7 +508,7 @@ export function FolderConnect() {
               >
                 <div className="min-w-0">
                   <div className="font-medium text-fg">
-                    {isBusy ? `Connecting ${h.name}…` : `Connect ${h.name}`}
+                    {isBusy ? `Connecting ${h.name}…` : `Connect ${h.name} Folder`}
                   </div>
                   <div className="mt-0.5 truncate text-xs text-fg-muted">
                     {showProgress
