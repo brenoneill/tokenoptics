@@ -10,6 +10,7 @@ import {
 } from "@headlessui/react";
 import { Fragment, useEffect, useState, type FormEvent } from "react";
 import { CheckCircleIcon } from "@heroicons/react/24/outline";
+import { track } from "@vercel/analytics";
 
 import { Input } from "@/components/ui/Input";
 import { useFormspree } from "@/lib/hooks/useFormspree";
@@ -29,8 +30,6 @@ export function LikeCTA() {
   const [signedUpEmail, setSignedUpEmail] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [email, setEmail] = useState("");
-
-  const like = useFormspree({ formId: "xbdwzwba" });
 
   const signup = useFormspree({
     formId: "mjglaldp",
@@ -76,7 +75,7 @@ export function LikeCTA() {
       const pref: LikePref = { likedAt: new Date().toISOString() };
       await setPref(LIKE_KEY, pref);
     })();
-    void like.submit({ feedback: "like", source: "sidebar" });
+    track("like_clicked", { source: "sidebar" });
   };
 
   const onSignupSubmit = async (e: FormEvent<HTMLFormElement>) => {

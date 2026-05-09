@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { track } from "@vercel/analytics";
 import {
   ArrowPathIcon,
   CheckIcon,
@@ -209,6 +210,7 @@ export function FolderConnect() {
   useEffect(() => {
     setSupported(typeof window !== "undefined" && "showDirectoryPicker" in window);
     setOs(detectOS());
+    track("connect_page_viewed");
   }, []);
 
   const refresh = useCallback(async () => {
@@ -230,6 +232,7 @@ export function FolderConnect() {
   const connectHarness = useCallback(
     async (harnessId: string) => {
       setError(null);
+      track("connect_button_pressed", { harnessId });
       let succeeded = false;
       try {
         const picked = await window.showDirectoryPicker({ mode: "read" });
@@ -257,6 +260,7 @@ export function FolderConnect() {
           setError(result.errors[harnessId]);
         } else {
           succeeded = true;
+          track("connect_succeeded", { harnessId });
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return; // user cancelled picker
