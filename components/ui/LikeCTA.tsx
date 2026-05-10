@@ -198,12 +198,21 @@ function SignupDialog({
             <DialogPanel className="w-full max-w-sm rounded-lg border border-border bg-bg shadow-xl">
               <form onSubmit={onSubmit}>
                 <div className="px-5 py-4">
-                  <DialogTitle className="text-base font-semibold text-fg">
+                  <DialogTitle className="flex items-center gap-2 text-base font-semibold text-fg">
+                    <span aria-hidden className="text-lg leading-none">❤️</span>
                     Sign up for updates
                   </DialogTitle>
-                  <p className="mt-1 text-sm text-fg-muted">
-                    Drop your email and I&rsquo;ll let you know when there&rsquo;s
-                    something new.
+                  <p className="mt-2 text-sm text-fg-muted">
+                    Thanks for the <span aria-hidden>❤️</span>
+                    <span className="sr-only">heart</span>!
+                    <br />
+                    <br />
+                    Drop your email and I&rsquo;ll let you know when
+                    there&rsquo;s something new.
+                  </p>
+                  <p className="mt-2 text-xs text-fg-subtle">
+                    If you want to get in touch use the Get in touch button in
+                    the sidebar.
                   </p>
                   <div className="mt-4">
                     <Input

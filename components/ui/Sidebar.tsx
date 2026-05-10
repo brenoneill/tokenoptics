@@ -9,6 +9,7 @@ import {
 } from "@heroicons/react/24/outline";
 import type { ComponentType, SVGProps } from "react";
 
+import { GetInTouch } from "@/components/connect/GetInTouch";
 import { LikeCTA } from "./LikeCTA";
 import { LogoMark } from "./LogoMark";
 
@@ -69,7 +70,8 @@ export function Sidebar() {
             );
           })}
         </div>
-        <div className="px-1 pt-3">
+        <div className="flex flex-col gap-2 px-1 pt-3">
+          <GetInTouch />
           <LikeCTA />
         </div>
       </nav>
