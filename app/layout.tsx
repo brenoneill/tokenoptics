@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://tokenoptics.vercel.app"),
+  metadataBase: new URL("https://tokenoptics.dev"),
   title: "Tokenoptics",
   description:
     "Transparency for Claude Code spend — see token, cost, and waste across your conversations.",

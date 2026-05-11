@@ -4,7 +4,7 @@
 
 Tokenoptics reads the session logs Claude Code writes to `~/.claude` and turns them into a navigable view of every conversation, branch, chunk, and model. See where the tokens went, what each session would have cost on the metered API, and which habits are quietly expensive — before usage-based pricing becomes the default.
 
-[**Try it →** tokenoptics.vercel.app](https://tokenoptics.vercel.app)
+[**Try it →** tokenoptics.dev](https://tokenoptics.dev)
 
 ![Tokenoptics conversations list](public/tokenoptics-conversations-list.png)
 
@@ -12,7 +12,7 @@ Tokenoptics reads the session logs Claude Code writes to `~/.claude` and turns t
 
 Most developers using AI today are on flat-rate plans — the per-token cost is invisible by design. The leading labs are absorbing real costs to capture market share, and that subsidy won't last forever. The habits you form on a plan will get repriced when the meter turns on.
 
-The longer-form argument lives at [/why](https://tokenoptics.vercel.app/why).
+The longer-form argument lives at [/why](https://tokenoptics.dev/why).
 
 ## What it shows
 
