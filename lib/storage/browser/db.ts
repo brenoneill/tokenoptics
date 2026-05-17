@@ -87,6 +87,14 @@ export interface PrefRow {
   updatedAt: string;
 }
 
+export interface RoutingRunRow {
+  // One row per session — re-running replaces the previous run.
+  sessionKey: string; // primary
+  runId: string;
+  completedAt: string;
+  data: unknown; // full RoutingRunRecord
+}
+
 export class TokenopticsDB extends Dexie {
   mounts!: Table<MountRow, string>;
   conversations!: Table<ConversationRow, string>;
@@ -97,6 +105,7 @@ export class TokenopticsDB extends Dexie {
   efficiencyTurns!: Table<EfficiencyTurnRow, string>;
   efficiencySpans!: Table<EfficiencySpanRow, string>;
   prefs!: Table<PrefRow, string>;
+  routingRuns!: Table<RoutingRunRow, string>;
 
   constructor() {
     super("tokenoptics");
@@ -112,6 +121,9 @@ export class TokenopticsDB extends Dexie {
     });
     this.version(2).stores({
       prefs: "key",
+    });
+    this.version(3).stores({
+      routingRuns: "sessionKey",
     });
   }
 }

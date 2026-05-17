@@ -1,7 +1,9 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { SparklesIcon } from "@heroicons/react/24/outline";
 
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -146,6 +148,15 @@ function ConversationDetail() {
                 <span className="text-fg-subtle">messages</span> {conversation.messageCount}
               </Badge>
             </>
+          }
+          actions={
+            <Link
+              href={`/analyze?p=${encodeURIComponent(conversation.projectId)}&s=${encodeURIComponent(conversation.sessionId)}`}
+              className="inline-flex items-center gap-2 rounded-md border border-violet/40 bg-violet-subtle px-3 py-2 text-sm font-medium text-violet transition-colors hover:bg-violet/20"
+            >
+              <SparklesIcon className="h-4 w-4" aria-hidden />
+              Analyze routing
+            </Link>
           }
         />
       </StickyHeader>
