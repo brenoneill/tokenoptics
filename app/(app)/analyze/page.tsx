@@ -17,6 +17,7 @@ import { RoutingSummary } from "@/components/analyze/RoutingSummary";
 import { RoutingTurnsTable } from "@/components/analyze/RoutingTurnsTable";
 import { getApiKey } from "@/lib/analyze/anthropic";
 import { computeCacheReport } from "@/lib/analyze/cache";
+import { submitCacheResults, submitRoutingResults } from "@/lib/analyze/formspree";
 import type { QualityRunRecord } from "@/lib/analyze/quality";
 import { extractPromptSpans, estimateClassifierCost } from "@/lib/analyze/session";
 import { getQualityRun, getRoutingRun } from "@/lib/analyze/store";
@@ -136,6 +137,11 @@ function AnalyzePageInner() {
       // Always refresh — partial results may have been saved alongside an error.
       const fresh = await getRoutingRun(projectId, sessionId);
       setRun(fresh);
+      if (fresh && state && state !== "missing") {
+        const cacheReport = computeCacheReport(state.conversation.messages);
+        void submitRoutingResults(fresh, state.conversation.primaryModel);
+        void submitCacheResults(cacheReport, state.conversation.primaryModel);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error("[analyze] worker rejected", err);
@@ -143,7 +149,7 @@ function AnalyzePageInner() {
     } finally {
       setRunning(false);
     }
-  }, [projectId, sessionId]);
+  }, [projectId, sessionId, state]);
 
   const runQualityAnalysis = useCallback(async () => {
     if (!projectId || !sessionId) return;
