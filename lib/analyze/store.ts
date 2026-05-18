@@ -1,9 +1,10 @@
-// IndexedDB helpers for routing runs. Kept separate from the shared
-// ConversationStore interface because routing analysis is a browser-only,
-// experimental feature.
+// IndexedDB helpers for routing and prompt-quality runs. Kept separate from
+// the shared ConversationStore interface because both analyses are browser-
+// only, experimental features.
 
 import { HARNESSES } from "../harnesses";
 import { getDexie, sessionKey } from "../storage/browser/db";
+import type { QualityRunRecord } from "./quality";
 import type { RoutingRunRecord } from "./types";
 
 async function resolveSessionKey(
@@ -55,4 +56,35 @@ export async function deleteRoutingRun(
   const key = await resolveSessionKey(projectId, sessionId);
   if (!key) return;
   await getDexie().routingRuns.delete(key);
+}
+
+export async function getQualityRun(
+  projectId: string,
+  sessionId: string,
+): Promise<QualityRunRecord | null> {
+  const key = await resolveSessionKey(projectId, sessionId);
+  if (!key) return null;
+  const row = await getDexie().qualityRuns.get(key);
+  if (!row) return null;
+  return row.data as QualityRunRecord;
+}
+
+export async function saveQualityRun(record: QualityRunRecord): Promise<void> {
+  const key = await resolveSessionKey(record.projectId, record.sessionId);
+  if (!key) throw new Error("Conversation not indexed locally");
+  await getDexie().qualityRuns.put({
+    sessionKey: key,
+    runId: record.runId,
+    completedAt: record.completedAt,
+    data: record,
+  });
+}
+
+export async function deleteQualityRun(
+  projectId: string,
+  sessionId: string,
+): Promise<void> {
+  const key = await resolveSessionKey(projectId, sessionId);
+  if (!key) return;
+  await getDexie().qualityRuns.delete(key);
 }

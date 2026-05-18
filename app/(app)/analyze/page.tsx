@@ -8,16 +8,26 @@ import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { PageHeader } from "@/components/ui/PageShell";
+import { CacheRecommendations } from "@/components/analyze/CacheRecommendations";
+import { CacheSummary } from "@/components/analyze/CacheSummary";
+import { CacheTrajectory } from "@/components/analyze/CacheTrajectory";
+import { QualitySummary } from "@/components/analyze/QualitySummary";
+import { QualityTasksTable } from "@/components/analyze/QualityTasksTable";
 import { RoutingSummary } from "@/components/analyze/RoutingSummary";
 import { RoutingTurnsTable } from "@/components/analyze/RoutingTurnsTable";
 import { getApiKey } from "@/lib/analyze/anthropic";
+import { computeCacheReport } from "@/lib/analyze/cache";
+import type { QualityRunRecord } from "@/lib/analyze/quality";
 import { extractPromptSpans, estimateClassifierCost } from "@/lib/analyze/session";
-import { getRoutingRun } from "@/lib/analyze/store";
+import { getQualityRun, getRoutingRun } from "@/lib/analyze/store";
 import type { RoutingRunRecord } from "@/lib/analyze/types";
 import { formatUSD } from "@/lib/pricing";
 import { getBrowserConversationStore } from "@/lib/storage/browser";
 import {
+  runQualityAnalysisInWorker,
   runRoutingAnalysisInWorker,
+  type QualityProgress,
+  type QualityPromptEvent,
   type RoutingProgress,
   type RoutingPromptEvent,
 } from "@/lib/storage/browser/syncClient";
@@ -28,6 +38,7 @@ interface PageState {
   promptCount: number;
   estimatedCost: number;
   existingRun: RoutingRunRecord | null;
+  existingQualityRun: QualityRunRecord | null;
 }
 
 function genRunId(): string {
@@ -49,6 +60,11 @@ function AnalyzePageInner() {
   const [progress, setProgress] = useState<RoutingProgress | null>(null);
   const [events, setEvents] = useState<RoutingPromptEvent[]>([]);
   const [run, setRun] = useState<RoutingRunRecord | null>(null);
+  const [qualityRunning, setQualityRunning] = useState(false);
+  const [qualityRunError, setQualityRunError] = useState<string | null>(null);
+  const [qualityProgress, setQualityProgress] = useState<QualityProgress | null>(null);
+  const [qualityEvents, setQualityEvents] = useState<QualityPromptEvent[]>([]);
+  const [qualityRun, setQualityRun] = useState<QualityRunRecord | null>(null);
 
   const hasApiKey = useMemo(() => getApiKey() !== null, []);
 
@@ -69,15 +85,20 @@ function AnalyzePageInner() {
         }
         const spans = extractPromptSpans(conversation.messages);
         const estimatedCost = estimateClassifierCost(spans);
-        const existingRun = await getRoutingRun(projectId, sessionId);
+        const [existingRun, existingQualityRun] = await Promise.all([
+          getRoutingRun(projectId, sessionId),
+          getQualityRun(projectId, sessionId),
+        ]);
         if (cancelled) return;
         setState({
           conversation,
           promptCount: spans.length,
           estimatedCost,
           existingRun,
+          existingQualityRun,
         });
         setRun(existingRun);
+        setQualityRun(existingQualityRun);
       } catch (err) {
         if (!cancelled) setLoadError(err instanceof Error ? err.message : String(err));
       }
@@ -119,6 +140,40 @@ function AnalyzePageInner() {
       setRunError(message);
     } finally {
       setRunning(false);
+    }
+  }, [projectId, sessionId]);
+
+  const runQualityAnalysis = useCallback(async () => {
+    if (!projectId || !sessionId) return;
+    setQualityRunning(true);
+    setQualityRunError(null);
+    setQualityProgress(null);
+    setQualityEvents([]);
+    console.info("[analyze] starting quality analysis", { projectId, sessionId });
+    try {
+      const runId = genRunId();
+      const dispatchResult = await runQualityAnalysisInWorker(
+        { projectId, sessionId, runId },
+        (p) => {
+          setQualityProgress(p);
+          if (p.event) {
+            console.info("[analyze] quality event", p.event);
+            setQualityEvents((prev) => [...prev, p.event!].slice(-50));
+          }
+        },
+      );
+      if (dispatchResult.error) {
+        console.error("[analyze] quality dispatch error", dispatchResult.error);
+        setQualityRunError(dispatchResult.error);
+      }
+      const fresh = await getQualityRun(projectId, sessionId);
+      setQualityRun(fresh);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[analyze] quality worker rejected", err);
+      setQualityRunError(message);
+    } finally {
+      setQualityRunning(false);
     }
   }, [projectId, sessionId]);
 
@@ -180,11 +235,22 @@ function AnalyzePageInner() {
 
   const { conversation, promptCount, estimatedCost } = state;
   const showRun = run;
+  // Cache report is pure compute over usage fields — recompute on every
+  // render. The op is cheap (sub-millisecond for typical sessions); no
+  // memoization needed beyond what React naturally provides.
+  const cacheReport = computeCacheReport(conversation.messages);
   const completed = progress?.completed ?? 0;
   const failed = progress?.failed ?? 0;
   const total = progress?.total ?? promptCount;
   const done = completed + failed;
   const pct = total > 0 ? Math.min(100, (done / total) * 100) : 0;
+
+  const showQualityRun = qualityRun;
+  const qCompleted = qualityProgress?.completed ?? 0;
+  const qFailed = qualityProgress?.failed ?? 0;
+  const qTotal = qualityProgress?.total ?? promptCount;
+  const qDone = qCompleted + qFailed;
+  const qPct = qTotal > 0 ? Math.min(100, (qDone / qTotal) * 100) : 0;
 
   return (
     <div>
@@ -320,6 +386,143 @@ function AnalyzePageInner() {
           <RoutingTurnsTable turns={showRun.turns} />
         </div>
       ) : null}
+
+      <div className="mt-10 border-t border-border-muted pt-6">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-medium text-fg">Prompt quality</h2>
+            <p className="mt-1 text-sm text-fg-muted">
+              Detects tasks where the user added info late (file paths,
+              frameworks, patterns, constraints) or reversed direction,
+              causing prior assistant work to be invalidated.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={runQualityAnalysis}
+            disabled={qualityRunning || !hasApiKey || promptCount === 0}
+            className="inline-flex shrink-0 items-center gap-2 rounded-md border border-violet/40 bg-violet-subtle px-3 py-2 text-sm font-medium text-violet transition-colors hover:bg-violet/20 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <SparklesIcon className="h-4 w-4" aria-hidden />
+            {qualityRunning
+              ? "Running…"
+              : qualityRun
+                ? "Re-run analysis"
+                : "Run analysis"}
+          </button>
+        </div>
+
+        {qualityRunError ? (
+          <Alert variant="danger" title="Quality analysis failed" className="mb-4">
+            <div className="font-mono text-xs break-all">{qualityRunError}</div>
+            <div className="mt-2 text-xs text-fg-subtle">
+              Check the browser devtools console for{" "}
+              <code className="font-mono">[analyze]</code> log entries with the
+              full error.
+            </div>
+          </Alert>
+        ) : null}
+
+        {!qualityRun && !qualityRunning && !qualityRunError ? (
+          <Alert variant="info" title="No run yet" className="mb-4">
+            This will send {promptCount} user prompt
+            {promptCount === 1 ? "" : "s"} to the Anthropic API (Haiku 4.5) for
+            quality classification. Estimated cost is similar to the routing
+            run — roughly <strong>{formatUSD(estimatedCost)}</strong>, since
+            both use the same model and per-call shape. Same no-egress caveat
+            applies.
+          </Alert>
+        ) : null}
+
+        {qualityRunning ? (
+          <div className="mb-4 rounded-md border border-accent/30 bg-accent-subtle px-4 py-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="text-sm font-medium text-fg">
+                Classifying prompt quality
+              </div>
+              <div className="font-mono text-xs text-fg-muted">
+                {qDone} / {qTotal}
+                {qFailed > 0 ? (
+                  <span className="ml-2 text-danger">({qFailed} failed)</span>
+                ) : null}
+              </div>
+            </div>
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-bg-subtle">
+              <div
+                className="h-full bg-accent transition-[width] duration-200"
+                style={{ width: `${qualityProgress ? qPct : 0}%` }}
+              />
+            </div>
+            <div className="mt-1 text-xs text-fg-subtle">
+              {qualityProgress
+                ? `Classifier: ${qualityRun?.classifierModel ?? "claude-haiku-4-5"} · 4 parallel requests`
+                : "Spawning worker and dispatching first batch…"}
+            </div>
+            {qualityEvents.length > 0 ? (
+              <ul className="mt-3 max-h-40 space-y-1 overflow-y-auto border-t border-border-muted pt-2 font-mono text-[11px]">
+                {qualityEvents
+                  .slice()
+                  .reverse()
+                  .map((ev, i) => (
+                    <li
+                      key={`${ev.index}-${i}`}
+                      className="flex items-baseline gap-2"
+                    >
+                      <span className="w-8 shrink-0 text-fg-subtle">
+                        #{ev.index + 1}
+                      </span>
+                      {ev.error ? (
+                        <span className="shrink-0 text-danger">error</span>
+                      ) : (
+                        <span className="shrink-0 text-violet">
+                          {ev.relationship}
+                        </span>
+                      )}
+                      <span className="truncate text-fg-muted">
+                        {ev.error ?? ev.promptPreview}
+                      </span>
+                    </li>
+                  ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+
+        {showQualityRun ? (
+          <div className="space-y-4">
+            <Alert variant="info" className="!py-2 text-xs">
+              Wasted output tokens are summed from assistant messages the
+              classifier flagged as invalidated by a later user reply. Scope is
+              user-side info gaps only — assistant errors and natural design
+              iteration are not counted.
+            </Alert>
+            <QualitySummary summary={showQualityRun.summary} />
+            <div className="text-xs text-fg-subtle">
+              Last run{" "}
+              <span suppressHydrationWarning>
+                {new Date(showQualityRun.completedAt).toLocaleString()}
+              </span>
+            </div>
+            <QualityTasksTable tasks={showQualityRun.tasks} />
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mt-10 border-t border-border-muted pt-6">
+        <div className="mb-4">
+          <h2 className="text-lg font-medium text-fg">Cache &amp; context</h2>
+          <p className="mt-1 text-sm text-fg-muted">
+            How much of this session&apos;s cost went to re-processing the
+            conversation&apos;s own history. Pure compute over usage fields —
+            no API key needed.
+          </p>
+        </div>
+        <div className="space-y-4">
+          <CacheSummary report={cacheReport} />
+          <CacheTrajectory report={cacheReport} />
+          <CacheRecommendations recommendations={cacheReport.recommendations} />
+        </div>
+      </div>
     </div>
   );
 }

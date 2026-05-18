@@ -20,7 +20,19 @@ import {
   type ClassifiedSpan,
   type PromptSpan,
 } from "../../analyze/session";
-import { saveRoutingRun } from "../../analyze/store";
+import {
+  aggregateTasks,
+  type ClassifiedQualitySpan,
+  type QualityRunRecord,
+  type QualityRunSummary,
+} from "../../analyze/quality";
+import {
+  buildRecentTurnWindow,
+  classifySpanQuality,
+  QUALITY_CLASSIFIER_MODEL,
+  type RecentAssistantTurn,
+} from "../../analyze/quality-classifier";
+import { saveQualityRun, saveRoutingRun } from "../../analyze/store";
 import { costForUsage } from "../../pricing";
 import type {
   RoutingRunRecord,
@@ -47,15 +59,29 @@ interface RoutingJob {
   runId: string;
 }
 
+interface QualityJob {
+  projectId: string;
+  sessionId: string;
+  runId: string;
+}
+
 type Inbound =
   | { type: "sync"; jobs: SyncJob[] }
   | { type: "analyze"; jobs: AnalyzeJob[] }
-  | { type: "analyze-routing"; jobs: RoutingJob[] };
+  | { type: "analyze-routing"; jobs: RoutingJob[] }
+  | { type: "analyze-quality"; jobs: QualityJob[] };
 
 interface RoutingPromptEvent {
   index: number;
   promptPreview: string;
   label?: string;
+  error?: string;
+}
+
+interface QualityPromptEvent {
+  index: number;
+  promptPreview: string;
+  relationship?: string;
   error?: string;
 }
 
@@ -74,6 +100,21 @@ type Outbound =
     }
   | {
       type: "routing-done";
+      projectId: string;
+      sessionId: string;
+      runId: string;
+    }
+  | {
+      type: "quality-progress";
+      projectId: string;
+      sessionId: string;
+      completed: number;
+      failed: number;
+      total: number;
+      event?: QualityPromptEvent;
+    }
+  | {
+      type: "quality-done";
       projectId: string;
       sessionId: string;
       runId: string;
@@ -393,6 +434,255 @@ async function runRouting(jobs: RoutingJob[]): Promise<void> {
   }
 }
 
+interface ClassifyQualityResult {
+  classified: ClassifiedQualitySpan[];
+  failures: { index: number; promptPreview: string; message: string }[];
+  classifierInput: number;
+  classifierOutput: number;
+}
+
+// Builds per-span recent-turn windows up-front so the parallel classifier
+// calls can be issued without any state sharing. For span i, the window is
+// the most-recent assistant turns drawn from spans 0..i-1. Indices are
+// local to each call — the classifier maps them back to uuids using the
+// same window it received.
+function buildRecentWindows(spans: PromptSpan[]): RecentAssistantTurn[][] {
+  const windows: RecentAssistantTurn[][] = [];
+  const accumulated: Message[] = [];
+  for (const span of spans) {
+    windows.push(buildRecentTurnWindow(accumulated, 0));
+    for (const m of span.assistantMessages) accumulated.push(m);
+  }
+  return windows;
+}
+
+async function classifyQualitySpans(
+  spans: PromptSpan[],
+  windows: RecentAssistantTurn[][],
+  onEvent: (
+    completed: number,
+    failed: number,
+    event: QualityPromptEvent,
+  ) => void,
+): Promise<ClassifyQualityResult> {
+  const classified: (ClassifiedQualitySpan | null)[] = new Array(spans.length).fill(null);
+  const failures: ClassifyQualityResult["failures"] = [];
+  let cursor = 0;
+  let completed = 0;
+  let failed = 0;
+  let classifierInput = 0;
+  let classifierOutput = 0;
+
+  const workers: Promise<void>[] = [];
+  for (let w = 0; w < Math.min(CLASSIFY_CONCURRENCY, spans.length); w++) {
+    workers.push(
+      (async () => {
+        while (true) {
+          const idx = cursor++;
+          if (idx >= spans.length) return;
+          const span = spans[idx];
+          const promptPreview = span.promptText.slice(0, 80);
+          try {
+            const result = await classifySpanQuality(
+              span.promptText,
+              span.priorAssistantContext,
+              windows[idx],
+            );
+            classified[idx] = {
+              span,
+              spanIndex: idx,
+              classification: {
+                relationship: result.relationship,
+                reason: result.reason,
+                latentInfo: result.latentInfo,
+                invalidatedTurnUuids: result.invalidatedTurnUuids,
+                classifierInputTokens: result.usage.inputTokens,
+                classifierOutputTokens: result.usage.outputTokens,
+              },
+            };
+            classifierInput += result.usage.inputTokens;
+            classifierOutput += result.usage.outputTokens;
+            completed++;
+            onEvent(completed, failed, {
+              index: idx,
+              promptPreview,
+              relationship: result.relationship,
+            });
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            failures.push({ index: idx, promptPreview, message });
+            failed++;
+            onEvent(completed, failed, {
+              index: idx,
+              promptPreview,
+              error: message,
+            });
+          }
+        }
+      })(),
+    );
+  }
+  await Promise.all(workers);
+  return {
+    classified: classified.filter(
+      (c): c is ClassifiedQualitySpan => c !== null,
+    ),
+    failures,
+    classifierInput,
+    classifierOutput,
+  };
+}
+
+function summarizeQuality(
+  tasks: ReturnType<typeof aggregateTasks>,
+  failedCount: number,
+  classifierInput: number,
+  classifierOutput: number,
+  sessionActualCost: number,
+): QualityRunSummary {
+  let wastefulTaskCount = 0;
+  let infoGapTaskCount = 0;
+  let directionChangeTaskCount = 0;
+  let mixedTaskCount = 0;
+  let totalWastedOutputTokens = 0;
+  let totalWastedCost = 0;
+  for (const t of tasks) {
+    if (t.category === "none") continue;
+    wastefulTaskCount++;
+    if (t.category === "info_gap") infoGapTaskCount++;
+    else if (t.category === "direction_change") directionChangeTaskCount++;
+    else if (t.category === "mixed") mixedTaskCount++;
+    totalWastedOutputTokens += t.wastedOutputTokens;
+    totalWastedCost += t.wastedCost;
+  }
+  const classifierCost = costForUsage(QUALITY_CLASSIFIER_MODEL, {
+    inputTokens: classifierInput,
+    outputTokens: classifierOutput,
+    cacheReadTokens: 0,
+    cacheWrite5mTokens: 0,
+    cacheWrite1hTokens: 0,
+  });
+  return {
+    totalTasks: tasks.length,
+    wastefulTaskCount,
+    infoGapTaskCount,
+    directionChangeTaskCount,
+    mixedTaskCount,
+    totalWastedOutputTokens,
+    totalWastedCost,
+    sessionActualCost,
+    skippedCount: failedCount,
+    classifierCost,
+    classifierModel: QUALITY_CLASSIFIER_MODEL,
+  };
+}
+
+function sessionActualCost(messages: Message[]): number {
+  let total = 0;
+  for (const m of messages) {
+    if (m.role !== "assistant" || !m.usage) continue;
+    total += costForUsage(m.model, m.usage);
+  }
+  return total;
+}
+
+async function runQuality(jobs: QualityJob[]): Promise<void> {
+  for (const job of jobs) {
+    const errorKey = `${job.projectId}:${job.sessionId}`;
+    try {
+      const messages = await loadSessionMessages(job.projectId, job.sessionId);
+      if (!messages) {
+        post({ type: "error", key: errorKey, message: "Conversation not indexed" });
+        continue;
+      }
+      const spans = extractPromptSpans(messages);
+      const actualSessionCost = sessionActualCost(messages);
+
+      if (spans.length === 0) {
+        const record: QualityRunRecord = {
+          runId: job.runId,
+          projectId: job.projectId,
+          sessionId: job.sessionId,
+          completedAt: new Date().toISOString(),
+          classifierModel: QUALITY_CLASSIFIER_MODEL,
+          summary: summarizeQuality([], 0, 0, 0, actualSessionCost),
+          tasks: [],
+        };
+        await saveQualityRun(record);
+        post({
+          type: "quality-done",
+          projectId: job.projectId,
+          sessionId: job.sessionId,
+          runId: job.runId,
+        });
+        continue;
+      }
+
+      post({
+        type: "quality-progress",
+        projectId: job.projectId,
+        sessionId: job.sessionId,
+        completed: 0,
+        failed: 0,
+        total: spans.length,
+      });
+
+      const windows = buildRecentWindows(spans);
+      const { classified, failures, classifierInput, classifierOutput } =
+        await classifyQualitySpans(spans, windows, (completed, failed, event) => {
+          post({
+            type: "quality-progress",
+            projectId: job.projectId,
+            sessionId: job.sessionId,
+            completed,
+            failed,
+            total: spans.length,
+            event,
+          });
+        });
+
+      if (classified.length === 0 && failures.length > 0) {
+        post({ type: "error", key: errorKey, message: failures[0].message });
+        continue;
+      }
+
+      const tasks = aggregateTasks(classified);
+      const record: QualityRunRecord = {
+        runId: job.runId,
+        projectId: job.projectId,
+        sessionId: job.sessionId,
+        completedAt: new Date().toISOString(),
+        classifierModel: QUALITY_CLASSIFIER_MODEL,
+        summary: summarizeQuality(
+          tasks,
+          failures.length,
+          classifierInput,
+          classifierOutput,
+          actualSessionCost,
+        ),
+        tasks,
+      };
+      await saveQualityRun(record);
+      if (failures.length > 0) {
+        post({
+          type: "error",
+          key: errorKey,
+          message: `${failures.length} of ${spans.length} prompts failed to classify (e.g. "${failures[0].message}"). Partial results saved.`,
+        });
+      }
+      post({
+        type: "quality-done",
+        projectId: job.projectId,
+        sessionId: job.sessionId,
+        runId: job.runId,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      post({ type: "error", key: errorKey, message });
+    }
+  }
+}
+
 self.onmessage = async (e: MessageEvent<Inbound>) => {
   const msg = e.data;
   if (msg.type === "sync") {
@@ -401,10 +691,12 @@ self.onmessage = async (e: MessageEvent<Inbound>) => {
     await runAnalyze(msg.jobs);
   } else if (msg.type === "analyze-routing") {
     await runRouting(msg.jobs);
+  } else if (msg.type === "analyze-quality") {
+    await runQuality(msg.jobs);
   } else {
     return;
   }
   post({ type: "complete" });
 };
 
-export type { AnalyzeJob, Inbound, Outbound, RoutingJob, SyncJob };
+export type { AnalyzeJob, Inbound, Outbound, QualityJob, RoutingJob, SyncJob };

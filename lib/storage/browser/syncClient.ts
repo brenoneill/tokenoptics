@@ -2,7 +2,14 @@
 // job batch, and terminates. Spawning is cheap; pooling could be added if
 // per-call latency becomes meaningful.
 
-import type { AnalyzeJob, Inbound, Outbound, RoutingJob, SyncJob } from "./worker";
+import type {
+  AnalyzeJob,
+  Inbound,
+  Outbound,
+  QualityJob,
+  RoutingJob,
+  SyncJob,
+} from "./worker";
 import type { SyncProgress } from "./sync";
 
 export type ProgressHandler = (harnessId: string, progress: SyncProgress) => void;
@@ -142,6 +149,68 @@ export function runRoutingAnalysisInWorker(
       }
     };
     const startMessage: Inbound = { type: "analyze-routing", jobs: [job] };
+    worker.postMessage(startMessage);
+  });
+}
+
+export interface QualityPromptEvent {
+  index: number;
+  promptPreview: string;
+  relationship?: string;
+  error?: string;
+}
+
+export interface QualityProgress {
+  projectId: string;
+  sessionId: string;
+  completed: number;
+  failed: number;
+  total: number;
+  event?: QualityPromptEvent;
+}
+
+export interface QualityRunDispatchResult {
+  runId: string | null;
+  error: string | null;
+}
+
+export function runQualityAnalysisInWorker(
+  job: QualityJob,
+  onProgress?: (progress: QualityProgress) => void,
+): Promise<QualityRunDispatchResult> {
+  const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
+  const result: QualityRunDispatchResult = { runId: null, error: null };
+  return new Promise<QualityRunDispatchResult>((resolve, reject) => {
+    worker.onerror = (e) => {
+      worker.terminate();
+      reject(new Error(e.message || "Quality analysis worker failed"));
+    };
+    worker.onmessage = (e: MessageEvent<Outbound>) => {
+      const msg = e.data;
+      switch (msg.type) {
+        case "quality-progress":
+          onProgress?.({
+            projectId: msg.projectId,
+            sessionId: msg.sessionId,
+            completed: msg.completed,
+            failed: msg.failed,
+            total: msg.total,
+            event: msg.event,
+          });
+          break;
+        case "quality-done":
+          result.runId = msg.runId;
+          break;
+        case "error":
+          result.error = msg.message;
+          break;
+        case "complete":
+          worker.terminate();
+          resolve(result);
+          break;
+      }
+    };
+    const startMessage: Inbound = { type: "analyze-quality", jobs: [job] };
     worker.postMessage(startMessage);
   });
 }

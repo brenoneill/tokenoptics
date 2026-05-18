@@ -63,7 +63,13 @@ Inputs you receive:
 
 How to choose:
 1. First check <prior_assistant_message>. If the assistant was asking the user something — a question, a plan to approve, a choice between options, a request for clarification — and the user's prompt reads as a response to that, label "continuation". This is true even if the prompt itself sounds substantive ("yes, refactor all three files like you described"): the work is bound to the prior task and prior model.
-2. Otherwise, pick from the four routable labels using the prompt and response signals. A prompt that reads trivial but triggered many tool calls / errors / thinking is "implementation" or "planning", not "cleanup". A prompt that looks ambitious but resolved in a single short response is "cleanup". Architecture/design/strategy without writing code is "planning". Use "default_implementation" only when it's clearly a coding task but doesn't fit cleanly elsewhere.
+2. Otherwise, pick from the four routable labels.
+
+Hard rule on planning vs implementation: "planning" is for DELIBERATION between approaches, architecture trade-offs, security reviews, or producing a written plan/spec/strategy document. A prompt that describes a feature, UI change, or refactor — even at length, even using the words "design" or "refactor" — is IMPLEMENTATION, because the user is specifying *what to build*. The test: if you can extract "here's the thing I want made" from the prompt, it's implementation. Planning is "should we do A or B?" or "produce a plan for X" — not "here's how X should look".
+
+Response-signal override: if <response_signals> shows the assistant used any code-writing tool — Edit, Write, MultiEdit, NotebookEdit — the label is almost certainly "implementation". Choose "planning" over a code-writing turn only when the writes are clearly incidental to a strategic discussion (e.g. updating a planning doc). Reading files alone (Read, Grep, Glob, Bash without writes) is consistent with planning; producing edits is not.
+
+Other guidance: a prompt that reads trivial but triggered many tool calls / errors / thinking is "implementation", not "cleanup". A prompt that looks ambitious but resolved in a single short response is "cleanup". Use "default_implementation" only when it's clearly a coding task but doesn't fit cleanly elsewhere.
 
 You MUST respond by calling the classify_prompt tool exactly once.`;
 }

@@ -95,6 +95,14 @@ export interface RoutingRunRow {
   data: unknown; // full RoutingRunRecord
 }
 
+export interface QualityRunRow {
+  // Prompt-quality analysis — one row per session, re-running replaces.
+  sessionKey: string; // primary
+  runId: string;
+  completedAt: string;
+  data: unknown; // full QualityRunRecord
+}
+
 export class TokenopticsDB extends Dexie {
   mounts!: Table<MountRow, string>;
   conversations!: Table<ConversationRow, string>;
@@ -106,6 +114,7 @@ export class TokenopticsDB extends Dexie {
   efficiencySpans!: Table<EfficiencySpanRow, string>;
   prefs!: Table<PrefRow, string>;
   routingRuns!: Table<RoutingRunRow, string>;
+  qualityRuns!: Table<QualityRunRow, string>;
 
   constructor() {
     super("tokenoptics");
@@ -124,6 +133,9 @@ export class TokenopticsDB extends Dexie {
     });
     this.version(3).stores({
       routingRuns: "sessionKey",
+    });
+    this.version(4).stores({
+      qualityRuns: "sessionKey",
     });
   }
 }

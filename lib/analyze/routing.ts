@@ -24,9 +24,9 @@ export const LABEL_TO_TIER: Record<RoutingLabel, RoutingTier> = {
 
 export const LABEL_DESCRIPTIONS: Record<RoutingLabel, string> = {
   planning:
-    "Planning, architecture, complex design decisions, security reviews — the kind of thinking that benefits from a frontier model.",
+    "Deliberation between approaches, architecture trade-offs, security reviews, or producing a written plan/spec/strategy document. The thinking-heavy stuff that benefits from a frontier model. NOT a detailed description of a feature/UI/refactor the user wants built — that's implementation.",
   implementation:
-    "Serious implementation work: writing or reviewing real code, debugging, cross-file refactors, building features.",
+    "Serious implementation work: writing or reviewing real code, debugging, cross-file refactors, building features, UI changes specified by the user.",
   default_implementation:
     "Default coding tasks that don't clearly fall into planning or cleanup — the workhorse bucket.",
   cleanup:
@@ -34,8 +34,8 @@ export const LABEL_DESCRIPTIONS: Record<RoutingLabel, string> = {
 };
 
 export const LABEL_TRIGGERS: Record<RoutingLabel, string[]> = {
-  planning: ["plan", "architect", "design system", "refactor architecture", "security review"],
-  implementation: ["review", "debug", "cross-file refactor", "implement", "build feature"],
+  planning: ["plan", "architect", "weigh trade-offs", "system design", "security review"],
+  implementation: ["review", "debug", "cross-file refactor", "implement", "build feature", "redesign the UI"],
   default_implementation: [],
   cleanup: ["lint", "format", "fix typo", "rename variable"],
 };
