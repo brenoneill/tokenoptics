@@ -48,6 +48,8 @@ function genRunId(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+const SHOW_QUALITY: boolean = false;
+
 function AnalyzePageInner() {
   const params = useSearchParams();
   const projectId = params.get("p");
@@ -387,6 +389,7 @@ function AnalyzePageInner() {
         </div>
       ) : null}
 
+      {SHOW_QUALITY ? (
       <div className="mt-10 border-t border-border-muted pt-6">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
@@ -507,6 +510,7 @@ function AnalyzePageInner() {
           </div>
         ) : null}
       </div>
+      ) : null}
 
       <div className="mt-10 border-t border-border-muted pt-6">
         <div className="mb-4">
