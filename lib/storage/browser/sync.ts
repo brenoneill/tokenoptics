@@ -1,3 +1,4 @@
+import { computeCacheHealth } from "../../analyze/cache";
 import type { FolderReader, Harness } from "../../harnesses/types";
 import { sessionKey, type TokenopticsDB } from "./db";
 import { hashMessagesAsync } from "./hash";
@@ -45,6 +46,7 @@ export async function syncMount(opts: SyncOptions): Promise<SyncProgress> {
     if (!conversation) continue;
 
     const contentHash = await hashMessagesAsync(conversation.messages);
+    const cacheHealth = computeCacheHealth(conversation.messages);
 
     await db.transaction("rw", db.conversations, db.messages, async () => {
       await db.conversations.put({
@@ -64,6 +66,7 @@ export async function syncMount(opts: SyncOptions): Promise<SyncProgress> {
         totalOutputTokens: conversation.totalOutputTokens,
         totalCacheReadTokens: conversation.totalCacheReadTokens,
         totalCacheWriteTokens: conversation.totalCacheWriteTokens,
+        cacheHealth,
         mtimeMs: session.mtimeMs ?? 0,
         contentHash,
       });

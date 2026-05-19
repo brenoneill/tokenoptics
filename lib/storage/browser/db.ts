@@ -1,5 +1,6 @@
 import Dexie, { type Table } from "dexie";
 
+import type { CacheHealth } from "../../analyze/cache";
 import type { Message } from "../../types";
 
 // IndexedDB row shapes. We keep field names camelCase (matching the TS types)
@@ -31,6 +32,11 @@ export interface ConversationRow {
   totalOutputTokens: number;
   totalCacheReadTokens: number;
   totalCacheWriteTokens: number;
+  // Three-state cache/context health summary, computed at sync time from the
+  // session's message stream (see analyze/cache.ts). null means the session
+  // is too short to classify. Optional on the type because rows written
+  // before the schema-5 migration won't have it until they get re-parsed.
+  cacheHealth?: CacheHealth | null;
   // Cache coherency
   mtimeMs: number; // file mtime — drives "is this row stale?" checks
   contentHash: string; // sha256 of message identity tuple — drives efficiency invalidation
@@ -137,6 +143,17 @@ export class TokenopticsDB extends Dexie {
     this.version(4).stores({
       qualityRuns: "sessionKey",
     });
+    // v5: introduces cacheHealth on conversations. No new index — the field
+    // is computed/written by sync. Zero out mtimeMs on existing rows so the
+    // next syncMount re-parses every session and fills the field in.
+    this.version(5).upgrade((tx) =>
+      tx
+        .table("conversations")
+        .toCollection()
+        .modify((row: ConversationRow) => {
+          row.mtimeMs = 0;
+        }),
+    );
   }
 }
 

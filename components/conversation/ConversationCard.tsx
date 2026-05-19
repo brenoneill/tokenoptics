@@ -15,6 +15,7 @@ import {
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { RelativeTime } from "@/components/ui/RelativeTime";
+import { CacheHealthDot } from "@/components/conversation/CacheHealthDot";
 import {
   addToComparison,
   isInComparison,
@@ -77,7 +78,8 @@ export function ConversationCard({ conversation, hasChunks = false }: Props) {
               </span>
             }
             right={
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
+                <CacheHealthDot health={conversation.cacheHealth} />
                 {hasChunks ? (
                   <Badge variant="violet" mono aria-label="Has chunks">
                     <SparklesIcon className="h-3 w-3" aria-hidden />

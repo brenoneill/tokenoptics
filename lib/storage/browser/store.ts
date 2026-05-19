@@ -39,6 +39,7 @@ function toSummary(row: ConversationRow): ConversationSummary {
     totalOutputTokens: row.totalOutputTokens,
     totalCacheReadTokens: row.totalCacheReadTokens,
     totalCacheWriteTokens: row.totalCacheWriteTokens,
+    cacheHealth: row.cacheHealth ?? null,
   };
 }
 

@@ -29,6 +29,8 @@ export interface Message {
   cost?: number;
 }
 
+import type { CacheHealth } from "./analyze/cache";
+
 export interface ConversationSummary {
   projectId: string;
   sessionId: string;
@@ -44,6 +46,10 @@ export interface ConversationSummary {
   totalOutputTokens: number;
   totalCacheReadTokens: number;
   totalCacheWriteTokens: number;
+  // Three-state traffic-light derived from the session's cache/context
+  // analysis. null = not yet computed (pre-migration row) or session too
+  // short to classify.
+  cacheHealth: CacheHealth | null;
 }
 
 export interface Conversation extends ConversationSummary {

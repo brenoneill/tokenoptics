@@ -22,6 +22,7 @@ export const mockConversations: ConversationSummary[] = [
     totalOutputTokens: 92_000,
     totalCacheReadTokens: 12_000,
     totalCacheWriteTokens: 24_000,
+    cacheHealth: "good",
   },
   {
     projectId: PROJECT_TOKENOPTICS,
@@ -38,6 +39,7 @@ export const mockConversations: ConversationSummary[] = [
     totalOutputTokens: 184_000,
     totalCacheReadTokens: 1_420_000,
     totalCacheWriteTokens: 71_000,
+    cacheHealth: "good",
   },
   {
     projectId: PROJECT_TOKENOPTICS,
@@ -54,6 +56,7 @@ export const mockConversations: ConversationSummary[] = [
     totalOutputTokens: 482_000,
     totalCacheReadTokens: 44_000,
     totalCacheWriteTokens: 198_000,
+    cacheHealth: "poor",
   },
   {
     projectId: PROJECT_TOKENOPTICS,
@@ -70,6 +73,7 @@ export const mockConversations: ConversationSummary[] = [
     totalOutputTokens: 138_000,
     totalCacheReadTokens: 920_000,
     totalCacheWriteTokens: 54_000,
+    cacheHealth: "climbing",
   },
   {
     projectId: PROJECT_TOKENOPTICS,
@@ -86,6 +90,7 @@ export const mockConversations: ConversationSummary[] = [
     totalOutputTokens: 96_000,
     totalCacheReadTokens: 612_000,
     totalCacheWriteTokens: 38_000,
+    cacheHealth: "good",
   },
   {
     projectId: PROJECT_TOKENOPTICS,
@@ -102,6 +107,7 @@ export const mockConversations: ConversationSummary[] = [
     totalOutputTokens: 38_000,
     totalCacheReadTokens: 6_000,
     totalCacheWriteTokens: 9_000,
+    cacheHealth: null,
   },
 ];
 

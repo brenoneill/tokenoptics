@@ -36,6 +36,17 @@ export type TokenBucket =
 
 export type RecommendationSeverity = "info" | "warn" | "critical";
 
+// Three-state summary derived from the recommendations above. "good" = no
+// drift signal fired; "climbing" = at least one warn (cost-per-turn ramping);
+// "poor" = at least one critical (low cache hit on a long session, or sharp
+// late-turn ramp). null is returned for sessions too short to assess.
+export type CacheHealth = "good" | "climbing" | "poor";
+
+// Sessions shorter than this don't have enough signal to classify — the
+// finalRampRatio is noisy on 3-turn sessions and the hit-ratio threshold is
+// only meaningful past LONG_SESSION_TURNS anyway.
+const HEALTH_MIN_TURNS = 5;
+
 export interface CacheRecommendation {
   severity: RecommendationSeverity;
   title: string;
@@ -314,4 +325,19 @@ export function computeCacheReport(messages: Message[]): CacheSessionReport {
     recoverableBloatCost: driftDetected ? aboveBaselineContextCost : 0,
     recommendations,
   };
+}
+
+export function cacheHealthFromReport(report: CacheSessionReport): CacheHealth | null {
+  if (report.assistantTurnCount < HEALTH_MIN_TURNS) return null;
+  for (const rec of report.recommendations) {
+    if (rec.severity === "critical") return "poor";
+  }
+  for (const rec of report.recommendations) {
+    if (rec.severity === "warn") return "climbing";
+  }
+  return "good";
+}
+
+export function computeCacheHealth(messages: Message[]): CacheHealth | null {
+  return cacheHealthFromReport(computeCacheReport(messages));
 }

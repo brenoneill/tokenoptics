@@ -256,6 +256,9 @@ export function normalizeJsonl(
     totalOutputTokens: totals.output,
     totalCacheReadTokens: totals.cacheRead,
     totalCacheWriteTokens: totals.cacheWrite,
+    // Filled in by sync (computeCacheHealth runs after parse). Harnesses
+    // don't know about analysis output, so the parse step leaves this null.
+    cacheHealth: null,
     messages,
   };
 }
