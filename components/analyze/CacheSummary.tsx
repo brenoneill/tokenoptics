@@ -14,37 +14,42 @@ export function CacheSummary({ report }: Props) {
     report.inputTokens + report.cacheReadTokens > 0
       ? `${(report.cacheHitRatio * 100).toFixed(0)}%`
       : "—";
-  const sharePct =
-    report.totalCost > 0
-      ? `${(report.aboveBaselineContextShare * 100).toFixed(0)}%`
-      : "—";
   const rampLabel =
     report.baselineTurnCost > 0
       ? `${report.finalRampRatio.toFixed(1)}×`
       : "—";
 
   const driftDetected = report.recoverableBloatCost > 0;
+  const driftSignalCount = report.recommendations.filter(
+    (r) => r.severity === "critical" || r.severity === "warn",
+  ).length;
+  // Recoverable spend as a share of total session cost — $0.00 / 0% when no
+  // drift fired, so this tracks the hero rather than the raw above-baseline.
+  const recoverableSharePct =
+    report.totalCost > 0
+      ? `${((report.recoverableBloatCost / report.totalCost) * 100).toFixed(0)}%`
+      : "—";
   const headerLabel = driftDetected
     ? "Estimated unnecessary spend"
-    : "Above-baseline context cost";
-  const heroValue = driftDetected
-    ? formatUSD(report.recoverableBloatCost)
-    : formatUSD(report.aboveBaselineContextCost);
+    : "Recoverable spend";
+  // Hero is always the drift-gated recoverable number — $0.00 when no drift
+  // signals fired. We intentionally don't surface the raw "above-baseline
+  // context cost" on this card: it reads as money lost when it's usually just
+  // the natural cost of a growing context. Only the drift-gated figure is
+  // actionable.
+  const heroValue = formatUSD(report.recoverableBloatCost);
   const headerHint = driftDetected
     ? "Drift signals fired — this cost is likely recoverable with /clear or /compact at the topic boundary."
-    : "Cache_read paid above the early-session baseline. In a focused session this is the natural cost of a growing context — not waste. Only counts as recoverable when drift signals fire.";
-  const recoverableLabel = driftDetected
-    ? "Likely recoverable"
-    : "Recoverable (no drift)";
-  const recoverableValue = driftDetected
-    ? formatUSD(report.recoverableBloatCost)
-    : "$0.00";
+    : "No drift signals fired — nothing here looks recoverable. A long, focused session re-reading its own context is expected, not waste.";
 
   return (
     <div className="grid gap-3 md:grid-cols-3">
       <Card label={headerLabel} hero={heroValue} hint={headerHint}>
-        <Row label="% of session cost" value={sharePct} />
-        <Row label={recoverableLabel} value={recoverableValue} />
+        <Row label="% of session cost" value={recoverableSharePct} />
+        <Row
+          label="Drift signals"
+          value={driftSignalCount === 0 ? "None" : String(driftSignalCount)}
+        />
         <Row label="Session total" value={formatUSD(report.totalCost)} />
       </Card>
 

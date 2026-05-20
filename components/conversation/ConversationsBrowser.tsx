@@ -24,13 +24,27 @@ import {
   setMinConversationCost,
   useMinConversationCost,
 } from "@/lib/preferences/minConversationCost";
+import type { CacheHealth } from "@/lib/analyze/cache";
 import type { ConversationSummary } from "@/lib/types";
 
 const ALL_PROJECTS = "__all__";
 const ALL_BRANCHES = "__all__";
 const NO_BRANCH = "__none__";
+const ALL_BLOAT = "__all__";
 
 type SortKey = "recent" | "cost-desc" | "cost-asc";
+
+// "Level of bloat" is the session's cache/context health — the same
+// traffic-light shown on each card (see CacheHealthDot). A conversation
+// with cacheHealth === null (too short to classify) only matches "All".
+type BloatFilter = typeof ALL_BLOAT | CacheHealth;
+
+const BLOAT_OPTIONS: { value: BloatFilter; label: string; dot: string }[] = [
+  { value: ALL_BLOAT, label: "All bloat levels", dot: "bg-fg-subtle" },
+  { value: "good", label: "No bloat", dot: "bg-success" },
+  { value: "climbing", label: "Climbing", dot: "bg-warn" },
+  { value: "poor", label: "Drift", dot: "bg-danger" },
+];
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "recent", label: "Recent" },
@@ -57,6 +71,7 @@ export function ConversationsBrowser({ entries, header }: Props) {
   const [query, setQuery] = useState("");
   const [project, setProject] = useState<string>(ALL_PROJECTS);
   const [branch, setBranch] = useState<string>(ALL_BRANCHES);
+  const [bloat, setBloat] = useState<BloatFilter>(ALL_BLOAT);
   const [labelledOnly, setLabelledOnly] = useState(false);
   const [sort, setSort] = useState<SortKey>("recent");
   const minCost = useMinConversationCost();
@@ -113,6 +128,7 @@ export function ConversationsBrowser({ entries, header }: Props) {
       const c = e.conversation;
       if (project !== ALL_PROJECTS && projectLabel(c) !== project) return false;
       if (branch !== ALL_BRANCHES && branchKey(c) !== branch) return false;
+      if (bloat !== ALL_BLOAT && c.cacheHealth !== bloat) return false;
       if (labelledOnly && !e.hasChunks) return false;
       if (minCost !== null && c.totalCost < minCost) return false;
       if (!q) return true;
@@ -134,7 +150,7 @@ export function ConversationsBrowser({ entries, header }: Props) {
       return sort === "cost-desc" ? -diff : diff;
     });
     return sorted;
-  }, [entries, query, project, branch, labelledOnly, minCost, sort]);
+  }, [entries, query, project, branch, bloat, labelledOnly, minCost, sort]);
 
   const totals = useMemo(() => {
     let cost = 0;
@@ -152,7 +168,11 @@ export function ConversationsBrowser({ entries, header }: Props) {
     query.trim().length > 0 ||
     project !== ALL_PROJECTS ||
     branch !== ALL_BRANCHES ||
+    bloat !== ALL_BLOAT ||
     labelledOnly;
+
+  const currentBloat =
+    BLOAT_OPTIONS.find((o) => o.value === bloat) ?? BLOAT_OPTIONS[0];
 
   return (
     <div className="space-y-5">
@@ -199,6 +219,46 @@ export function ConversationsBrowser({ entries, header }: Props) {
             <SparklesIcon className="h-3.5 w-3.5" aria-hidden />
             Labeled
           </button>
+          <Menu as="div" className="relative">
+            <MenuButton
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-emphasis px-2.5 py-0.5 text-xs text-fg-muted transition-colors hover:bg-bg-subtle data-[open]:bg-bg-subtle"
+              aria-label="Filter by bloat level"
+            >
+              <span
+                className={`inline-block h-2 w-2 rounded-full ${currentBloat.dot}`}
+                aria-hidden
+              />
+              <span className="text-fg">{currentBloat.label}</span>
+              <ChevronDownIcon className="h-3.5 w-3.5" aria-hidden />
+            </MenuButton>
+            <MenuItems
+              anchor="bottom start"
+              className="z-40 mt-1 min-w-[12rem] rounded-md border border-border bg-bg shadow-lg outline-none"
+            >
+              {BLOAT_OPTIONS.map((opt) => (
+                <MenuItem key={opt.value}>
+                  {({ focus }) => (
+                    <button
+                      type="button"
+                      onClick={() => setBloat(opt.value)}
+                      className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm ${
+                        focus ? "bg-bg-emphasis text-fg" : "text-fg-muted"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-2 w-2 rounded-full ${opt.dot}`}
+                        aria-hidden
+                      />
+                      <span className="flex-1">{opt.label}</span>
+                      {bloat === opt.value ? (
+                        <CheckIcon className="h-4 w-4 text-accent" aria-hidden />
+                      ) : null}
+                    </button>
+                  )}
+                </MenuItem>
+              ))}
+            </MenuItems>
+          </Menu>
           {minCost !== null ? (
             <Badge variant="sky" className="pr-1" mono>
               Min cost {formatUSD(minCost)}
