@@ -14,8 +14,8 @@ interface Pillar {
 const PILLARS: Pillar[] = [
   {
     icon: FolderIcon,
-    title: "Reads what's already on your machine",
-    body: "Claude Code stores every session locally under ~/.claude/projects. Tokenoptics indexes those files in your browser — there's nothing new to install or sync.",
+    title: "Built on data you already have",
+    body: "Claude Code logs every session — every token, cache read, and model — to ~/.claude/projects. Tokenoptics indexes those files in your browser to surface what they've been recording all along. Nothing new to install or sync.",
   },
   {
     icon: LockClosedIcon,

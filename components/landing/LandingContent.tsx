@@ -1,3 +1,4 @@
+import { BloatSection } from "@/components/landing/BloatSection";
 import { ChunksSection } from "@/components/landing/ChunksSection";
 import { ConnectOrGoCTA } from "@/components/landing/ConnectOrGoCTA";
 import { Hero } from "@/components/landing/Hero";
@@ -16,6 +17,7 @@ export function LandingContent() {
         <LevelDemo />
         <ChunksSection />
         <ModelComparisonSection />
+        <BloatSection />
         <WhyTeaserSection />
 
         <section className="rounded-xl border border-accent/30 bg-bg-subtle/60 px-8 py-12 text-center">

@@ -89,17 +89,19 @@ describe("computeCacheReport — bloat metrics", () => {
     expect(cacheHealthFromReport(report)).toBe("poor");
   });
 
-  it("bloat suffix uses the 'unnecessary spend / likely recoverable' wording", () => {
+  it("bloat suffix uses the 'likely recoverable' wording", () => {
     // Regression guard: the suffix must not revert to "Above-baseline context
-    // cost", and must stay aligned with the CacheSummary hero card wording.
+    // cost" or "unnecessary spend", and must stay aligned with the
+    // CacheSummary hero card wording.
     const report = computeCacheReport(
       sessionFromCacheReads(SHARP_RAMP_CACHE_READ),
     );
     const [rec] = report.recommendations;
 
-    expect(rec.message).toContain("Estimated unnecessary spend");
-    expect(rec.message).toContain("likely recoverable");
+    expect(rec.message).toContain("Likely recoverable");
+    expect(rec.message).toContain("/clear or /compact");
     expect(rec.message).not.toContain("Above-baseline");
+    expect(rec.message).not.toContain("unnecessary spend");
   });
 
   it("moderate ramp → warn 'climbing' and recoverable bloat", () => {
@@ -145,7 +147,7 @@ describe("computeCacheReport — bloat metrics", () => {
     // though a drift signal fired — and the suffix is omitted.
     expect(report.aboveBaselineContextCost).toBe(0);
     expect(report.recoverableBloatCost).toBe(0);
-    expect(rec.message).not.toContain("Estimated unnecessary spend");
+    expect(rec.message).not.toContain("Likely recoverable");
 
     expect(cacheHealthFromReport(report)).toBe("poor");
   });
@@ -167,7 +169,7 @@ describe("computeCacheReport — bloat metrics", () => {
     expect(report.recommendations[0].severity).toBe("info");
     expect(report.recommendations[0].title).toContain("churning");
     expect(report.recommendations[0].message).not.toContain(
-      "Estimated unnecessary spend",
+      "Likely recoverable",
     );
     expect(report.recoverableBloatCost).toBe(0);
     expect(cacheHealthFromReport(report)).toBe("good");

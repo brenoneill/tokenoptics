@@ -86,7 +86,7 @@ export interface CacheSessionReport {
   // The portion of aboveBaselineContextCost that drift signals indicate
   // is genuinely recoverable. Equals aboveBaselineContextCost when any
   // critical or warn recommendation fires; otherwise 0. This is the
-  // "unnecessary spend" number — gated on actual evidence of drift.
+  // "likely recoverable" number — gated on actual evidence of drift.
   recoverableBloatCost: number;
   // Cost-per-turn trajectory in order, for the bar chart.
   trajectory: CacheTurnPoint[];
@@ -194,7 +194,7 @@ function buildRecommendations(
   // still 0 on the baseReport buildRecommendations runs against.
   const bloatSuffix =
     report.aboveBaselineContextCost > 0
-      ? ` Estimated unnecessary spend: ${formatUSD(report.aboveBaselineContextCost)} (${(report.aboveBaselineContextShare * 100).toFixed(0)}% of session cost) — likely recoverable with /clear or /compact at the topic boundary.`
+      ? ` Likely recoverable: ${formatUSD(report.aboveBaselineContextCost)} (${(report.aboveBaselineContextShare * 100).toFixed(0)}% of session cost) — drop it with /clear or /compact at the topic boundary.`
       : "";
 
   if (

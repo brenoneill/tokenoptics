@@ -30,7 +30,7 @@ export function CacheSummary({ report }: Props) {
       ? `${((report.recoverableBloatCost / report.totalCost) * 100).toFixed(0)}%`
       : "—";
   const headerLabel = driftDetected
-    ? "Estimated unnecessary spend"
+    ? "Likely recoverable"
     : "Recoverable spend";
   // Hero is always the drift-gated recoverable number — $0.00 when no drift
   // signals fired. We intentionally don't surface the raw "above-baseline

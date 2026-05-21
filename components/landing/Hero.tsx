@@ -14,15 +14,20 @@ export function Hero() {
           </span>
         </div>
 
-        <h1 className="mt-12 max-w-3xl text-5xl font-semibold leading-[1.05] tracking-tight text-fg sm:text-6xl">
-          Where did all your{" "}
-          <span className="text-violet">Claude Code</span> spend go?
+        <div className="mt-12 font-mono text-[11px] uppercase tracking-[0.2em] text-violet">
+          the data is already on your disk
+        </div>
+
+        <h1 className="mt-3 max-w-3xl text-5xl font-semibold leading-[1.05] tracking-tight text-fg sm:text-6xl">
+          Every <span className="text-violet">Claude Code</span> session is
+          already logged. Put it to work.
         </h1>
 
         <p className="mt-6 max-w-2xl text-lg text-fg-muted">
-          Token-level visibility into every session, branch, and project — built
-          on the transcripts already sitting on your machine. Nothing uploaded.
-          Nothing tracked.
+          AI coding tools quietly write every session to a folder on your
+          machine — tokens, cache reads, models, cost, all of it. Tokenoptics
+          turns that untapped local record into a clear read on your
+          token-consumption habits. Nothing uploaded. Nothing tracked.
         </p>
 
         <div className="mt-10 flex flex-wrap items-center gap-3">

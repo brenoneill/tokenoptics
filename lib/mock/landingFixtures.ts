@@ -1,7 +1,8 @@
+import { computeCacheReport, type CacheSessionReport } from "@/lib/analyze/cache";
 import { colorForChunkIndex, type ChunkColor } from "@/lib/labeling/colors";
 import type { ChunkType } from "@/lib/labeling/types";
 import type { ScopeStats } from "@/lib/efficiency/scopeStats";
-import type { ConversationSummary } from "@/lib/types";
+import type { ConversationSummary, Message } from "@/lib/types";
 
 const PROJECT_TOKENOPTICS = "-Users-dev-code-tokenoptics-app";
 const CWD_TOKENOPTICS = "/Users/dev/code/tokenoptics-app";
@@ -276,5 +277,103 @@ export const mockChunkDemo: ChunkDemoEntry[] = [
       endedAt: chunkTime(28),
       durationMs: 3 * 60_000,
     },
+  },
+];
+
+// --- Bloat / cache-trajectory demo ---------------------------------------
+//
+// The landing "context bloat" section runs the *real* analyzer
+// (computeCacheReport) over synthetic transcripts so the chart, the
+// recommendations, and the traffic-light health all come from the same
+// code path the app uses on real sessions. Each session is built as a list
+// of assistant turns with a cache_read curve — flat for the healthy one,
+// steepening for the others.
+
+const BLOAT_BASE_MS = Date.parse("2026-05-12T09:00:00.000Z");
+
+function bloatSession(
+  model: string,
+  inputPerTurn: number,
+  outputPerTurn: number,
+  cacheWrite5mPerTurn: number,
+  cacheReadCurve: number[],
+): Message[] {
+  return cacheReadCurve.map(
+    (cacheReadTokens, i): Message => ({
+      uuid: `bloat-${model}-${i}`,
+      parentUuid: i === 0 ? null : `bloat-${model}-${i - 1}`,
+      role: "assistant",
+      timestamp: new Date(BLOAT_BASE_MS + i * 90_000).toISOString(),
+      model,
+      blocks: [{ kind: "text", text: "" }],
+      usage: {
+        inputTokens: inputPerTurn,
+        outputTokens: outputPerTurn,
+        cacheReadTokens,
+        cacheWrite5mTokens: cacheWrite5mPerTurn,
+        cacheWrite1hTokens: 0,
+      },
+    }),
+  );
+}
+
+const k = (n: number) => n * 1_000;
+
+// Flat-ish cache_read: a focused single-topic session. No drift signals.
+const HEALTHY_CURVE = [
+  160, 170, 185, 200, 210, 220, 235, 245, 255, 265, 280,
+].map(k);
+
+// Cache_read creeping up — context window growing as the session sprawls.
+const CLIMBING_CURVE = [
+  150, 170, 195, 240, 300, 380, 470, 580, 700, 840, 980, 1130, 1280, 1430,
+  1560, 1680,
+].map(k);
+
+// Cache_read ballooning — one session that never got a /clear.
+const BLOATED_CURVE = [
+  160, 180, 210, 260, 330, 420, 530, 660, 810, 980, 1170, 1380, 1610, 1860,
+  2130, 2420, 2700, 2980, 3240, 3480, 3700, 3900, 4080, 4240, 4380, 4500,
+  4600, 4680, 4740, 4780,
+].map(k);
+
+export interface BloatDemoSession {
+  id: string;
+  label: string;
+  meta: string;
+  verdict: string;
+  report: CacheSessionReport;
+}
+
+export const bloatDemoSessions: BloatDemoSession[] = [
+  {
+    id: "healthy",
+    label: "Healthy session",
+    meta: "11 assistant turns · Sonnet · one feature",
+    verdict:
+      "A tight, single-topic session. Cost per turn stays flat — the cache is carrying the context for next to nothing.",
+    report: computeCacheReport(
+      bloatSession("claude-sonnet-4-6", 3_000, 8_000, 12_000, HEALTHY_CURVE),
+    ),
+  },
+  {
+    id: "climbing",
+    label: "Starting to drift",
+    meta: "16 assistant turns · Opus · began to sprawl",
+    verdict:
+      "Cost per turn is creeping up as the context window grows. A /clear at the next topic switch would reset the baseline.",
+    report: computeCacheReport(
+      bloatSession("claude-opus-4-7", 3_000, 4_000, 6_000, CLIMBING_CURVE),
+    ),
+  },
+  {
+    id: "bloated",
+    label: "Heavy bloat",
+    meta: "30 assistant turns · Opus · never cleared",
+    verdict:
+      "One session drifted across three unrelated tasks. Late turns cost roughly 10× the early ones — almost all of it cache_read on stale history.",
+    report: computeCacheReport(
+      bloatSession("claude-opus-4-7", 3_000, 4_000, 6_000, BLOATED_CURVE),
+    ),
   },
 ];
