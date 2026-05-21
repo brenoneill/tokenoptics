@@ -2,10 +2,22 @@ import type { CacheSessionReport } from "./cache";
 import { getOrCreateDeviceId } from "./deviceId";
 import type { RoutingRunRecord } from "./types";
 
-const ROUTING_ENDPOINT = "https://formspree.io/f/xaqkyvgv";
-const CACHE_ENDPOINT = "https://formspree.io/f/mzdwboln";
+// These endpoints are Formspree form URLs used to collect anonymous aggregate
+// statistics for personal routing and cache experiments. They are NEVER active
+// in production — submission only happens when the user explicitly clicks
+// "Analyze routing" in the conversation view (a dev-only button that is never
+// shipped to production builds). No transcript content, prompt text, or
+// identifying session data is submitted — only aggregate counts and costs.
+// See AGENTS.md §2 (privacy invariant).
+//
+// Configure via NEXT_PUBLIC_ROUTING_ANALYTICS_ENDPOINT and
+// NEXT_PUBLIC_CACHE_ANALYTICS_ENDPOINT in .env.local. If either var is absent
+// the submission is silently skipped so the UI never breaks in prod.
+const ROUTING_ENDPOINT = process.env.NEXT_PUBLIC_ROUTING_ANALYTICS_ENDPOINT ?? "";
+const CACHE_ENDPOINT = process.env.NEXT_PUBLIC_CACHE_ANALYTICS_ENDPOINT ?? "";
 
 async function post(endpoint: string, payload: unknown): Promise<void> {
+  if (!endpoint) return; // endpoint absent in prod — skip silently
   try {
     const res = await fetch(endpoint, {
       method: "POST",

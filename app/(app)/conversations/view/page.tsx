@@ -253,6 +253,12 @@ function ConversationDetail() {
             </>
           }
           actions={
+            // This button is NEVER shipped to production. It is only visible
+            // "Analyze routing" is a personal experiment — it calls the
+            // Anthropic API with the user's own key and submits anonymous
+            // aggregate stats to Formspree (see lib/analyze/formspree.ts).
+            // when a local NEXT_PUBLIC_ANTHROPIC_API_KEY is present (hasApiKey)
+            // so it cannot appear in the public Vercel deployment.
             hasApiKey && !analysisStarted ? (
               <button
                 type="button"
