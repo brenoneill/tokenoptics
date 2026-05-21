@@ -117,7 +117,7 @@ function Row({ turn, index }: { turn: RoutingTurnRecord; index: number }) {
       {open ? (
         <tr className="border-b border-border-muted bg-bg-subtle/20">
           <td colSpan={9} className="px-4 py-3">
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="gap-3">
               <div>
                 <div className="text-[10px] uppercase tracking-wider text-fg-subtle">
                   Full prompt
@@ -128,7 +128,7 @@ function Row({ turn, index }: { turn: RoutingTurnRecord; index: number }) {
                 </pre>
               </div>
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-fg-subtle">
+                <div className="text-[10px] uppercase tracking-wider text-fg-subtle mt-2">
                   Classifier reasoning
                 </div>
                 <p className="mt-1 text-xs italic text-fg-muted">

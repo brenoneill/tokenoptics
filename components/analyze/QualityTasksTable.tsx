@@ -92,7 +92,7 @@ function Row({ task, index }: { task: QualityTaskRecord; index: number }) {
       {open ? (
         <tr className="border-b border-border-muted bg-bg-subtle/20">
           <td colSpan={6} className="px-4 py-3">
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="flex flex-col gap-3">
               <div>
                 <div className="text-[10px] uppercase tracking-wider text-fg-subtle">
                   Full lead prompt

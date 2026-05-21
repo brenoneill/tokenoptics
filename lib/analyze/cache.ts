@@ -188,9 +188,13 @@ function buildRecommendations(
 ): CacheRecommendation[] {
   const recs: CacheRecommendation[] = [];
 
+  // The value is aboveBaselineContextCost, but this suffix is only appended to
+  // warn/critical recs — and whenever one fires, drift is detected, so this
+  // equals recoverableBloatCost. We can't read recoverableBloatCost here: it's
+  // still 0 on the baseReport buildRecommendations runs against.
   const bloatSuffix =
     report.aboveBaselineContextCost > 0
-      ? ` Above-baseline context cost in this session: ${formatUSD(report.aboveBaselineContextCost)} (${(report.aboveBaselineContextShare * 100).toFixed(0)}% of session cost) — likely recoverable given the drift signal above.`
+      ? ` Estimated unnecessary spend: ${formatUSD(report.aboveBaselineContextCost)} (${(report.aboveBaselineContextShare * 100).toFixed(0)}% of session cost) — likely recoverable with /clear or /compact at the topic boundary.`
       : "";
 
   if (
