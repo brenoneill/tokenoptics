@@ -3,29 +3,43 @@ import {
   FolderIcon,
   LockClosedIcon,
 } from "@heroicons/react/24/outline";
-import type { ComponentType, SVGProps } from "react";
+import type { ComponentType, ReactNode, SVGProps } from "react";
 
 interface Pillar {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   title: string;
-  body: string;
+  body: ReactNode;
 }
 
 const PILLARS: Pillar[] = [
   {
     icon: FolderIcon,
     title: "Built on data you already have",
-    body: "Claude Code logs every session — every token, cache read, and model — to ~/.claude/projects. Tokenoptics indexes those files in your browser to surface what they've been recording all along. Nothing new to install or sync.",
+    body: "Claude Code logs every session — every token, cache read, and model — to ~/.claude/projects. Tokenoptics indexes those files in your browser to surface what they've been recording all along.",
   },
   {
     icon: LockClosedIcon,
     title: "Nothing leaves your device",
-    body: "No server, no upload, no telemetry, no account. Disconnect any time and your data stays exactly where it was.",
+    body: "No server, no upload, no telemetry, no account — every byte of analysis runs in your browser. Disconnect any time and your data stays exactly where it was.",
   },
   {
     icon: CodeBracketIcon,
     title: "Open-source — verify it yourself",
-    body: "Every line of analysis logic is auditable. Don't trust us, read the code.",
+    body: (
+      <>
+        Every line of analysis logic is auditable. Don&apos;t trust us — read
+        the full source on{" "}
+        <a
+          href="https://github.com/brenoneill/tokenoptics"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-violet underline underline-offset-2 hover:no-underline"
+        >
+          GitHub
+        </a>
+        .
+      </>
+    ),
   },
 ];
 
