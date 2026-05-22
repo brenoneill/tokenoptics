@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { SparklesIcon } from "@heroicons/react/24/outline";
+import { ArrowDownTrayIcon, SparklesIcon } from "@heroicons/react/24/outline";
 
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -15,11 +15,13 @@ import { CacheTrajectory } from "@/components/analyze/CacheTrajectory";
 import { RoutingAnalysisPanel } from "@/components/analyze/RoutingAnalysisPanel";
 import { ConversationDetailSkeleton } from "@/components/conversation/ConversationDetailSkeleton";
 import { ConversationView } from "@/components/conversation/ConversationView";
+import { ExportDialog } from "@/components/conversation/ExportDialog";
 import { getApiKey } from "@/lib/analyze/anthropic";
 import { computeCacheReport } from "@/lib/analyze/cache";
 import { submitCacheResults, submitRoutingResults } from "@/lib/analyze/formspree";
+import type { QualityRunRecord } from "@/lib/analyze/quality";
 import { extractPromptSpans, estimateClassifierCost } from "@/lib/analyze/session";
-import { getRoutingRun } from "@/lib/analyze/store";
+import { getQualityRun, getRoutingRun } from "@/lib/analyze/store";
 import type { RoutingRunRecord } from "@/lib/analyze/types";
 import { claudeCodeHarness } from "@/lib/harnesses/claudeCode";
 import type { Chunk } from "@/lib/labeling/types";
@@ -57,6 +59,7 @@ function ConversationDetail() {
   const [state, setState] = useState<LoadedState | null | "missing">(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("conversation");
+  const [exportOpen, setExportOpen] = useState(false);
 
   // Routing analysis state. This used to be its own /analyze page; it now
   // lives as the "Analysis" tab. The page owns the state so the tab can
@@ -66,6 +69,9 @@ function ConversationDetail() {
   const [progress, setProgress] = useState<RoutingProgress | null>(null);
   const [events, setEvents] = useState<RoutingPromptEvent[]>([]);
   const [run, setRun] = useState<RoutingRunRecord | null>(null);
+  // Loaded on mount so the export can include a prior quality run if one
+  // exists. Quality runs are never triggered from this page.
+  const [qualityRun, setQualityRun] = useState<QualityRunRecord | null>(null);
 
   const reloadChunks = useCallback(async () => {
     if (!projectId || !sessionId) return;
@@ -99,7 +105,11 @@ function ConversationDetail() {
         const chunks = await store.getChunks(projectId, sessionId, conversation.messages);
         const spans = extractPromptSpans(conversation.messages);
         // Surface any prior routing run so the "Analysis" tab is shown on load.
-        const existingRun = await getRoutingRun(projectId, sessionId);
+        // The quality run, if any, is loaded purely so the export can include it.
+        const [existingRun, existingQuality] = await Promise.all([
+          getRoutingRun(projectId, sessionId),
+          getQualityRun(projectId, sessionId),
+        ]);
         if (cancelled) return;
         setState({
           conversation,
@@ -108,6 +118,7 @@ function ConversationDetail() {
           estimatedCost: estimateClassifierCost(spans),
         });
         setRun(existingRun);
+        setQualityRun(existingQuality);
 
         // Run efficiency analysis off the main thread. The worker reads
         // messages from IndexedDB, hashes them against the cached row, and
@@ -253,23 +264,35 @@ function ConversationDetail() {
             </>
           }
           actions={
-            // This button is NEVER shipped to production. It is only visible
-            // "Analyze routing" is a personal experiment — it calls the
-            // Anthropic API with the user's own key and submits anonymous
-            // aggregate stats to Formspree (see lib/analyze/formspree.ts).
-            // when a local NEXT_PUBLIC_ANTHROPIC_API_KEY is present (hasApiKey)
-            // so it cannot appear in the public Vercel deployment.
-            hasApiKey && !analysisStarted ? (
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={runAnalysis}
-                disabled={promptCount === 0}
-                className="inline-flex items-center gap-2 rounded-md border border-violet/40 bg-violet-subtle px-3 py-2 text-sm font-medium text-violet transition-colors hover:bg-violet/20 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => setExportOpen(true)}
+                className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-fg-muted transition-colors hover:bg-bg-emphasis hover:text-fg"
               >
-                <SparklesIcon className="h-4 w-4" aria-hidden />
-                Analyze routing
+                <ArrowDownTrayIcon className="h-4 w-4" aria-hidden />
+                Export
               </button>
-            ) : undefined
+              {/*
+                The "Analyze routing" button is NEVER shipped to production.
+                It's a personal experiment — it calls the Anthropic API with
+                the user's own key and submits anonymous aggregate stats to
+                Formspree (see lib/analyze/formspree.ts). It only renders when
+                a local NEXT_PUBLIC_ANTHROPIC_API_KEY is present (hasApiKey),
+                so it cannot appear in the public Vercel deployment.
+              */}
+              {hasApiKey && !analysisStarted ? (
+                <button
+                  type="button"
+                  onClick={runAnalysis}
+                  disabled={promptCount === 0}
+                  className="inline-flex items-center gap-2 rounded-md border border-violet/40 bg-violet-subtle px-3 py-2 text-sm font-medium text-violet transition-colors hover:bg-violet/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <SparklesIcon className="h-4 w-4" aria-hidden />
+                  Analyze routing
+                </button>
+              ) : null}
+            </div>
           }
         />
         <nav
@@ -339,6 +362,16 @@ function ConversationDetail() {
           />
         ) : null}
       </div>
+
+      <ExportDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        conversation={conversation}
+        chunks={chunks}
+        cacheReport={cacheReport}
+        routingRun={run}
+        qualityRun={qualityRun}
+      />
     </div>
   );
 }
