@@ -30,6 +30,7 @@ interface RawContent {
 }
 
 interface RawMessage {
+  id?: string;
   role?: "user" | "assistant";
   model?: string;
   content?: RawContent[] | string;
@@ -183,6 +184,7 @@ export function normalizeJsonl(
   const lines = raw.split("\n").filter((l) => l.trim().length > 0);
 
   const messages: Message[] = [];
+  const seenAssistantUsageIds = new Set<string>();
   let cwd = "";
   let gitBranch: string | undefined;
   let aiTitle: string | undefined;
@@ -206,9 +208,25 @@ export function normalizeJsonl(
     const blocks = toBlocks(entry.message.content);
     if (blocks.length === 0) continue;
 
-    const usage = toUsage(entry.message.usage);
     const model = entry.message.model;
-    const cost = usage ? costForUsage(model, usage) : undefined;
+    const apiMessageId = entry.message.id;
+    let usage = toUsage(entry.message.usage);
+    let cost: number | undefined;
+
+    // Claude Code emits multiple JSONL lines per assistant response (streaming
+    // chunks) that share message.id and repeat the same usage block. Count
+    // usage once per id so session totals match billed tokens.
+    if (usage && entry.type === "assistant") {
+      const usageKey = apiMessageId ?? entry.uuid;
+      if (usageKey && seenAssistantUsageIds.has(usageKey)) {
+        usage = undefined;
+      } else {
+        if (usageKey) seenAssistantUsageIds.add(usageKey);
+        cost = costForUsage(model, usage);
+      }
+    } else if (usage) {
+      cost = costForUsage(model, usage);
+    }
 
     messages.push({
       uuid: entry.uuid ?? "",
@@ -216,6 +234,7 @@ export function normalizeJsonl(
       role: entry.type as "user" | "assistant",
       timestamp: entry.timestamp ?? "",
       model,
+      apiMessageId,
       blocks,
       usage,
       cost,

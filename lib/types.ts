@@ -24,6 +24,9 @@ export interface Message {
   role: "user" | "assistant";
   timestamp: string;
   model?: string;
+  // Claude Code API message id — shared across streaming JSONL lines for one
+  // assistant response. Usage is attributed only on the first line per id.
+  apiMessageId?: string;
   blocks: ContentBlock[];
   usage?: Usage;
   cost?: number;

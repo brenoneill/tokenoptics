@@ -154,6 +154,16 @@ export class TokenopticsDB extends Dexie {
           row.mtimeMs = 0;
         }),
     );
+    // v6: assistant usage deduped by message.id during parse. Re-parse cached
+    // sessions so conversation totals and per-message costs are corrected.
+    this.version(6).upgrade((tx) =>
+      tx
+        .table("conversations")
+        .toCollection()
+        .modify((row: ConversationRow) => {
+          row.mtimeMs = 0;
+        }),
+    );
   }
 }
 
