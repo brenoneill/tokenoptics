@@ -9,6 +9,7 @@ export interface ModelPricing {
 }
 
 export const PRICING: Record<string, ModelPricing> = {
+  "claude-fable-5": { input: 10.0, output: 50.0, cacheRead: 1.0, cacheWrite: 12.5, cacheWrite1h: 20.0 },
   "claude-opus-4-8": { input: 5.0, output: 25.0, cacheRead: 0.5, cacheWrite: 6.25, cacheWrite1h: 10.0 },
   "claude-opus-4-7": { input: 5.0, output: 25.0, cacheRead: 0.5, cacheWrite: 6.25, cacheWrite1h: 10.0 },
   "claude-opus-4-6": { input: 5.0, output: 25.0, cacheRead: 0.5, cacheWrite: 6.25, cacheWrite1h: 10.0 },
