@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { AutoSyncBanner } from "@/components/AutoSyncBanner";
 import { Sidebar } from "./Sidebar";
 
 interface PageShellProps {
@@ -10,6 +11,7 @@ export function PageShell({ children }: PageShellProps) {
     <div className="flex min-h-screen">
       <Sidebar />
       <main className="flex-1 overflow-x-clip">
+        <AutoSyncBanner />
         <div className="mx-auto max-w-6xl px-8 py-8">{children}</div>
       </main>
     </div>
