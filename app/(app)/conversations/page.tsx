@@ -11,8 +11,11 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageShell";
 import { ConversationsBrowser } from "@/components/conversation/ConversationsBrowser";
 import { ConversationsPageSkeleton } from "@/components/conversation/ConversationsPageSkeleton";
+import { KiroCreditPortfolioPanel } from "@/components/analyze/KiroCreditPortfolioPanel";
+import { computeCreditPortfolio } from "@/lib/analyze/creditPortfolio";
 import { analysisKey } from "@/lib/labeling/keys";
-import { formatUSD } from "@/lib/pricing";
+import { useKiroPlan } from "@/lib/preferences/kiroPlan";
+import { formatCredits, formatUSD, isCreditHarness } from "@/lib/pricing";
 import {
   getBrowserConversationStore,
   getMounts,
@@ -20,6 +23,7 @@ import {
 import type { ConversationEntry } from "@/components/conversation/ConversationsBrowser";
 
 export default function ConversationsPage() {
+  const kiroPlan = useKiroPlan();
   const [entries, setEntries] = useState<ConversationEntry[] | null>(null);
   const [hasMount, setHasMount] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,8 +84,19 @@ export default function ConversationsPage() {
   }
 
   const safeEntries = entries ?? [];
-  const totalCost = safeEntries.reduce((sum, e) => sum + e.conversation.totalCost, 0);
+  const summaries = safeEntries.map((e) => e.conversation);
   const labeledCount = safeEntries.filter((e) => e.hasChunks).length;
+
+  // Header total must match the Kiro panel: token (Claude Code) sessions are
+  // summed at their per-session cost, while Kiro sessions use the plan-aware
+  // figure (flat fee + overage), NOT the marginal $0.04/credit sum — otherwise
+  // the header and the credit panel would disagree.
+  const tokenCost = summaries
+    .filter((c) => !isCreditHarness(c.harnessId))
+    .reduce((sum, c) => sum + c.totalCost, 0);
+  const kiroPortfolio = computeCreditPortfolio(summaries, kiroPlan);
+  const hasKiro = summaries.some((c) => isCreditHarness(c.harnessId));
+  const totalCost = tokenCost + kiroPortfolio.totalCost;
 
   const pageHeader = (
     <PageHeader
@@ -92,9 +107,23 @@ export default function ConversationsPage() {
           <Badge mono>
             <span className="text-fg-subtle">count</span> {safeEntries.length}
           </Badge>
-          <Badge variant="accent" mono>
+          <Badge
+            variant="accent"
+            mono
+            title={
+              hasKiro
+                ? `Token sessions at per-session cost + Kiro sessions at the ${kiroPlan} plan estimate (flat fee + overage). Matches the Kiro credit panel.`
+                : "Sum of per-session cost."
+            }
+          >
             <span className="text-fg-subtle">total</span> {formatUSD(totalCost)}
           </Badge>
+          {hasKiro ? (
+            <Badge variant="sky" mono>
+              <span className="text-fg-subtle">kiro</span>{" "}
+              {formatCredits(kiroPortfolio.totalCredits)} cr
+            </Badge>
+          ) : null}
           {labeledCount > 0 ? (
             <Badge variant="violet" mono>
               <span className="text-fg-subtle">labeled</span> {labeledCount}
@@ -113,7 +142,7 @@ export default function ConversationsPage() {
         <EmptyState
           icon={FolderOpenIcon}
           title="No folders connected"
-          description="Connect a Claude Code projects folder to start indexing your conversations."
+          description="Connect a Claude Code or Kiro CLI sessions folder to start indexing your conversations."
           action={
             <Link
               href="/connect"
@@ -130,7 +159,11 @@ export default function ConversationsPage() {
   return (
     <div>
       <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Conversations" }]} />
-      <ConversationsBrowser entries={safeEntries} header={pageHeader} />
+      <ConversationsBrowser
+        entries={safeEntries}
+        header={pageHeader}
+        beforeList={<KiroCreditPortfolioPanel conversations={summaries} />}
+      />
     </div>
   );
 }

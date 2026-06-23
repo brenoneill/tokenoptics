@@ -4,6 +4,8 @@
 
 Tokenoptics reads the session logs Claude Code writes to `~/.claude` and turns them into a navigable view of every conversation, branch, chunk, and model. See where the tokens went, what each session would have cost on the metered API, and which habits are quietly expensive — before usage-based pricing becomes the default.
 
+It also reads **Kiro CLI** sessions (`~/.kiro/sessions/cli`). Kiro meters in credits rather than tokens, so those sessions are shown credit-natively — credits spent, a plan-aware cost estimate, and a per-billing-month burn-down — alongside the same Claude Code views.
+
 [**Try it →** tokenoptics.dev](https://tokenoptics.dev)
 
 ![Tokenoptics conversations list](public/tokenoptics-conversations-list.png)
@@ -21,6 +23,7 @@ The longer-form argument lives at [/why](https://tokenoptics.dev/why).
 - **Chunk-level cost** — every prompt-to-response unit priced individually, with diffs against the previous chunk so you can see what each turn changed.
 - **Model comparison** — replay any conversation's token shape against Opus / Sonnet / Haiku pricing to see what it would have cost on a different tier.
 - **Efficiency hints** — flags long error loops, oversized context, and other patterns worth knowing about.
+- **Credit-native Kiro view** — for Kiro CLI sessions, shows credits spent, a plan-aware cost estimate (flat fee + overage), and a per-billing-month burn-down, since Kiro meters in credits rather than tokens.
 
 ![Conversation detail with per-chunk cost and model comparison](public/tokenoptics-conversation-detail.png)
 
@@ -82,11 +85,11 @@ components/
   connect/               Folder-mount UI
   ui/                    Shared primitives
 lib/
-  harnesses/             Adapters per source (Claude Code today; pluggable)
+  harnesses/             Adapters per source (Claude Code + Kiro CLI; pluggable)
   storage/browser/       File System Access + Dexie + sync worker
   efficiency/            Cost shaping, chunk pricing, rules
   normalize.ts           JSONL → Conversation model
-  pricing.ts             Per-model token prices
+  pricing.ts             Per-model token + credit prices
 ```
 
 ## Contributing

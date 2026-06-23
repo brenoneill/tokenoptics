@@ -7,6 +7,11 @@ export interface ScopeStats {
   outputTokens: number;
   cacheReadTokens: number;
   cacheWriteTokens: number;
+  // Kiro sessions meter in credits, not tokens. credits > 0 (and isCredits)
+  // marks a credit-based session so the UI can show credit-native stats
+  // instead of the always-zero token counts.
+  credits: number;
+  isCredits: boolean;
   messageCount: number;
   promptCount: number;
   linesAdded: number;
@@ -24,6 +29,7 @@ export function computeScopeStats(messages: Message[]): ScopeStats {
   let outputTokens = 0;
   let cacheReadTokens = 0;
   let cacheWriteTokens = 0;
+  let credits = 0;
   let promptCount = 0;
   let firstMs = Number.POSITIVE_INFINITY;
   let lastMs = Number.NEGATIVE_INFINITY;
@@ -37,6 +43,7 @@ export function computeScopeStats(messages: Message[]): ScopeStats {
       outputTokens += m.usage.outputTokens;
       cacheReadTokens += m.usage.cacheReadTokens;
       cacheWriteTokens += m.usage.cacheWrite5mTokens + m.usage.cacheWrite1hTokens;
+      credits += m.usage.credits ?? 0;
     }
     if (m.role === "user" && userPromptText(m)) promptCount += 1;
 
@@ -74,6 +81,8 @@ export function computeScopeStats(messages: Message[]): ScopeStats {
     outputTokens,
     cacheReadTokens,
     cacheWriteTokens,
+    credits,
+    isCredits: credits > 0,
     messageCount: messages.length,
     promptCount,
     linesAdded,

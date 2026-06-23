@@ -4,7 +4,12 @@ import type { CSSProperties, ReactNode } from "react";
 
 import type { ChunkColor } from "@/lib/labeling/colors";
 import type { ScopeStats } from "@/lib/efficiency/scopeStats";
-import { formatTokens, formatUSD } from "@/lib/pricing";
+import {
+  KIRO_CREDIT_RATE_USD,
+  formatCredits,
+  formatTokens,
+  formatUSD,
+} from "@/lib/pricing";
 
 interface Props {
   scopeLabel: string;
@@ -18,12 +23,20 @@ export function StatBar({ scopeLabel, stats, color }: Props) {
 
   return (
     <div className="grid gap-3 md:grid-cols-3">
-      <Card color={color} label="Cost" hero={formatUSD(stats.cost)}>
-        <Row label="Input" value={`${formatTokens(stats.inputTokens)} tok`} />
-        <Row label="Output" value={`${formatTokens(stats.outputTokens)} tok`} />
-        <Row label="Cache read" value={`${formatTokens(stats.cacheReadTokens)} tok`} />
-        <Row label="Cache write" value={`${formatTokens(stats.cacheWriteTokens)} tok`} />
-      </Card>
+      {stats.isCredits ? (
+        <Card color={color} label="Cost" hero={formatUSD(stats.cost)}>
+          <Row label="Credits used" value={formatCredits(stats.credits)} />
+          <Row label="Rate" value={`$${KIRO_CREDIT_RATE_USD.overage}/credit`} />
+          <Row label="Basis" value="overage" />
+        </Card>
+      ) : (
+        <Card color={color} label="Cost" hero={formatUSD(stats.cost)}>
+          <Row label="Input" value={`${formatTokens(stats.inputTokens)} tok`} />
+          <Row label="Output" value={`${formatTokens(stats.outputTokens)} tok`} />
+          <Row label="Cache read" value={`${formatTokens(stats.cacheReadTokens)} tok`} />
+          <Row label="Cache write" value={`${formatTokens(stats.cacheWriteTokens)} tok`} />
+        </Card>
+      )}
 
       <Card color={color} label="Duration" hero={formatDuration(stats.durationMs)}>
         <Row

@@ -1,7 +1,12 @@
 import { UserIcon, SparklesIcon } from "@heroicons/react/24/outline";
 
 import { Badge } from "@/components/ui/Badge";
-import { formatTokens, formatUSD } from "@/lib/pricing";
+import {
+  KIRO_CREDIT_RATE_USD,
+  formatCredits,
+  formatTokens,
+  formatUSD,
+} from "@/lib/pricing";
 import type { Message } from "@/lib/types";
 
 import { TextBlock } from "./TextBlock";
@@ -24,6 +29,11 @@ function formatTime(iso: string): string {
 export function MessageBlock({ message, hideText = false }: Props) {
   const isUser = message.role === "user";
   const Icon = isUser ? UserIcon : SparklesIcon;
+  // A defined credits field (even 0) marks a credit-metered turn: the Kiro
+  // normalizer always sets it, token harnesses never do. Drives credit-vs-token
+  // display so Kiro turns never show "in 0 · out 0".
+  const credits = message.usage?.credits;
+  const isCredits = typeof credits === "number";
 
   return (
     <article
@@ -49,7 +59,12 @@ export function MessageBlock({ message, hideText = false }: Props) {
           </Badge>
         ) : null}
         <span className="ml-auto flex items-center gap-2">
-          {message.usage ? (
+          {isCredits ? (
+            <Badge mono>
+              {formatCredits(credits)}{" "}
+              <span className="text-fg-subtle">credits</span>
+            </Badge>
+          ) : message.usage ? (
             <Badge mono>
               <span className="text-fg-subtle">in</span>{" "}
               {formatTokens(message.usage.inputTokens)}
@@ -59,7 +74,15 @@ export function MessageBlock({ message, hideText = false }: Props) {
           ) : null}
           {typeof message.cost === "number" && message.cost > 0 ? (
             <Badge variant="accent" mono>
-              {formatUSD(message.cost)}
+              <span
+                title={
+                  isCredits
+                    ? `${formatCredits(credits)} credits × $${KIRO_CREDIT_RATE_USD.overage}/credit`
+                    : undefined
+                }
+              >
+                {formatUSD(message.cost)}
+              </span>
             </Badge>
           ) : null}
           <span

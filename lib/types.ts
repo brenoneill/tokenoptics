@@ -16,6 +16,10 @@ export interface Usage {
   cacheReadTokens: number;
   cacheWrite5mTokens: number;
   cacheWrite1hTokens: number;
+  // Kiro CLI meters in credits, not tokens. Optional + additive: token-based
+  // harnesses (Claude Code) leave it undefined. The per-model multiplier is
+  // already baked in by Kiro, so this is the priceable unit for those sessions.
+  credits?: number;
 }
 
 export interface Message {
@@ -35,6 +39,10 @@ export interface Message {
 import type { CacheHealth } from "./analyze/cache";
 
 export interface ConversationSummary {
+  // Which harness produced this session (e.g. "claude-code", "kiro-cli"). Drives
+  // token-vs-credit UI: Kiro sessions are credit-metered regardless of whether a
+  // given session happened to record credits. Optional for pre-migration rows.
+  harnessId?: string;
   projectId: string;
   sessionId: string;
   title: string;
@@ -49,6 +57,9 @@ export interface ConversationSummary {
   totalOutputTokens: number;
   totalCacheReadTokens: number;
   totalCacheWriteTokens: number;
+  // Kiro CLI sessions only: total credits metered across the session. undefined
+  // for token-based harnesses. When set, totalCost is derived from credits.
+  totalCredits?: number;
   // Three-state traffic-light derived from the session's cache/context
   // analysis. null = not yet computed (pre-migration row) or session too
   // short to classify.

@@ -5,7 +5,7 @@ import { ChevronRightIcon } from "@heroicons/react/24/outline";
 
 import { DiffBlock } from "@/components/conversation/DiffBlock";
 import { MessageBlock } from "@/components/conversation/MessageBlock";
-import { formatUSD } from "@/lib/pricing";
+import { formatCredits, formatUSD } from "@/lib/pricing";
 import type { FoldRenderItem } from "@/lib/transcript";
 
 interface Props {
@@ -18,6 +18,7 @@ interface Props {
   removedLines: number;
   rewrittenLines: number;
   totalCost: number;
+  totalCredits: number;
 }
 
 export function CollapsedFold({
@@ -30,6 +31,7 @@ export function CollapsedFold({
   removedLines,
   rewrittenLines,
   totalCost,
+  totalCredits,
 }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -79,7 +81,12 @@ export function CollapsedFold({
             </span>
           </span>
         ) : null}
-        {totalCost > 0 ? (
+        {totalCredits > 0 ? (
+          <span className="ml-auto flex items-center gap-2 font-mono text-fg-subtle">
+            <span>{formatCredits(totalCredits)} cr</span>
+            {totalCost > 0 ? <span>{formatUSD(totalCost)}</span> : null}
+          </span>
+        ) : totalCost > 0 ? (
           <span className="ml-auto font-mono text-fg-subtle">
             {formatUSD(totalCost)}
           </span>

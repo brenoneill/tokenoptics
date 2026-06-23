@@ -32,6 +32,8 @@ export interface ConversationRow {
   totalOutputTokens: number;
   totalCacheReadTokens: number;
   totalCacheWriteTokens: number;
+  // Kiro CLI only: total credits metered. undefined for token-based harnesses.
+  totalCredits?: number;
   // Three-state cache/context health summary, computed at sync time from the
   // session's message stream (see analyze/cache.ts). null means the session
   // is too short to classify. Optional on the type because rows written
@@ -154,8 +156,13 @@ export class TokenopticsDB extends Dexie {
           row.mtimeMs = 0;
         }),
     );
-    // v6: assistant usage deduped by message.id during parse. Re-parse cached
-    // sessions so conversation totals and per-message costs are corrected.
+    // v6: two changes that both require re-parsing cached sessions —
+    // (a) assistant usage is now deduped by message.id during parse, correcting
+    //     conversation totals and per-message costs; and
+    // (b) totalCredits is introduced on conversations (Kiro credit sessions);
+    //     rows written before the field existed have it undefined.
+    // The mtime-skip would never re-parse those rows, so zero out mtimeMs again
+    // and the next syncMount re-parses every session, fixing both.
     this.version(6).upgrade((tx) =>
       tx
         .table("conversations")

@@ -92,6 +92,39 @@ async function resolveClaudeCodeFolder(
   };
 }
 
+// Looks for .json session files directly in the folder — the shape of Kiro CLI's
+// flat sessions/cli directory.
+async function containsJsonInFolder(handle: FileSystemDirectoryHandle): Promise<boolean> {
+  for await (const [name, entry] of handle.entries()) {
+    if (entry.kind === "file" && name.endsWith(".json")) return true;
+  }
+  return false;
+}
+
+// Validates the picked folder is Kiro CLI's sessions/cli directory. As with
+// Claude Code, access to a parent grants access to descendants, so if the user
+// picked ~/.kiro (or ~/.kiro/sessions) we descend to sessions/cli for them.
+async function resolveKiroCliFolder(
+  handle: FileSystemDirectoryHandle,
+): Promise<ResolveResult> {
+  if (await containsJsonInFolder(handle)) return { ok: true, handle };
+
+  for (const path of [["cli"], ["sessions", "cli"]]) {
+    try {
+      let dir = handle;
+      for (const seg of path) dir = await dir.getDirectoryHandle(seg);
+      if (await containsJsonInFolder(dir)) return { ok: true, handle: dir };
+    } catch {
+      /* path doesn't exist — try the next */
+    }
+  }
+
+  return {
+    ok: false,
+    message: `"${handle.name}" doesn't look like a Kiro CLI sessions folder. It should contain .json session files — pick ~/.kiro/sessions/cli.`,
+  };
+}
+
 function CopyPath({ path }: { path: string }) {
   const [copied, setCopied] = useState(false);
   const onCopy = async () => {
@@ -249,6 +282,13 @@ export function FolderConnect() {
             return;
           }
           handle = resolved.handle;
+        } else if (harnessId === "kiro-cli") {
+          const resolved = await resolveKiroCliFolder(picked);
+          if (!resolved.ok) {
+            setError(resolved.message);
+            return;
+          }
+          handle = resolved.handle;
         }
 
         await setMount(harnessId, handle, handle.name);
@@ -354,30 +394,46 @@ export function FolderConnect() {
           title="No folders connected"
           description={
             <>
-              Connect a Claude Code projects folder (typically{" "}
-              <span className="font-mono">~/.claude/projects</span>) to start
-              indexing your conversations. See{" "}
+              Tokenoptics reads the session logs already on your machine. Connect
+              whichever tool(s) you use:{" "}
+              <strong>Claude Code</strong> (
+              <span className="font-mono">~/.claude/projects</span>) or{" "}
+              <strong>Kiro CLI</strong> (
+              <span className="font-mono">~/.kiro/sessions/cli</span>). See{" "}
               <strong>How to connect</strong> below for the fastest way to find
-              it.
+              either.
             </>
           }
           action={
-            <button
-              type="button"
-              disabled={busy === "claude-code"}
-              onClick={() => void connectHarness("claude-code")}
-              aria-busy={busy === "claude-code"}
-              className="inline-flex items-center gap-2 rounded-md border border-accent bg-accent px-4 py-2 text-sm font-medium text-bg hover:opacity-90 disabled:cursor-wait disabled:opacity-80"
-            >
-              {busy === "claude-code" ? (
-                <ArrowPathIcon className="h-4 w-4 animate-spin" aria-hidden />
-              ) : (
-                <FolderOpenIcon className="h-4 w-4" aria-hidden />
-              )}
-              {busy === "claude-code"
-                ? "Connecting Claude Code…"
-                : "Connect Claude Code Folder"}
-            </button>
+            <div className="flex flex-wrap justify-center gap-2">
+              {HARNESSES.map((h, i) => {
+                const isBusy = busy === h.id;
+                // First harness gets the filled accent treatment, the rest an
+                // outline — equal prominence, just one visual primary.
+                const primary = i === 0;
+                return (
+                  <button
+                    key={h.id}
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => void connectHarness(h.id)}
+                    aria-busy={isBusy}
+                    className={
+                      primary
+                        ? "inline-flex items-center gap-2 rounded-md border border-accent bg-accent px-4 py-2 text-sm font-medium text-bg hover:opacity-90 disabled:cursor-wait disabled:opacity-80"
+                        : "inline-flex items-center gap-2 rounded-md border border-accent px-4 py-2 text-sm font-medium text-accent hover:bg-accent-subtle disabled:cursor-wait disabled:opacity-80"
+                    }
+                  >
+                    {isBusy ? (
+                      <ArrowPathIcon className="h-4 w-4 animate-spin" aria-hidden />
+                    ) : (
+                      <FolderOpenIcon className="h-4 w-4" aria-hidden />
+                    )}
+                    {isBusy ? `Connecting ${h.name}…` : `Connect ${h.name}`}
+                  </button>
+                );
+              })}
+            </div>
           }
         />
       ) : (
@@ -446,52 +502,54 @@ export function FolderConnect() {
           </div>
 
           <Alert variant="info" title="How to connect">
-            Claude Code lives in{" "}
-            <span className="font-mono">~/.claude/projects</span>, which is hidden
-            by the OS. The fastest way to select it:
+            Both folders are hidden by the OS. Click a{" "}
+            <strong>Connect</strong> button below to open the picker, then jump
+            straight to the right folder:
             <ol className="mt-2 space-y-1.5 text-fg">
-              <li>
-                <strong>1.</strong> Click{" "}
-                <strong>Connect Claude Code Folder</strong> to open the folder
-                picker.
-              </li>
               {os === "windows" ? (
-                <>
-                  <li>
-                    <strong>2.</strong> Click the address bar at the top of the
-                    picker.
-                  </li>
-                  <li>
-                    <strong>3.</strong> Copy{" "}
-                    <CopyPath path="%USERPROFILE%\.claude\projects" />, paste it
-                    in, then press <Kbd>↵</Kbd>.
-                  </li>
-                </>
+                <li>
+                  <strong>1.</strong> Click the address bar at the top of the
+                  picker.
+                </li>
               ) : os === "linux" ? (
-                <>
-                  <li>
-                    <strong>2.</strong> Press <Kbd>Ctrl</Kbd> <Kbd>L</Kbd> to open
-                    the path bar.
-                  </li>
-                  <li>
-                    <strong>3.</strong> Copy <CopyPath path="~/.claude/projects" />,
-                    paste it in, then press <Kbd>↵</Kbd>.
-                  </li>
-                </>
+                <li>
+                  <strong>1.</strong> Press <Kbd>Ctrl</Kbd> <Kbd>L</Kbd> to open
+                  the path bar.
+                </li>
               ) : (
-                <>
-                  <li>
-                    <strong>2.</strong> Press <Kbd>⌘</Kbd> <Kbd>⇧</Kbd>{" "}
-                    <Kbd>G</Kbd> to open &ldquo;Go to folder&rdquo;.
-                  </li>
-                  <li>
-                    <strong>3.</strong> Copy <CopyPath path="~/.claude/projects" />,
-                    paste it in, then press <Kbd>↵</Kbd>.
-                  </li>
-                </>
+                <li>
+                  <strong>1.</strong> Press <Kbd>⌘</Kbd> <Kbd>⇧</Kbd> <Kbd>G</Kbd>{" "}
+                  to open &ldquo;Go to folder&rdquo;.
+                </li>
               )}
               <li>
-                <strong>4.</strong> Click <strong>Select</strong>.
+                <strong>2.</strong> Paste the path for your tool, then press{" "}
+                <Kbd>↵</Kbd>:
+                <ul className="mt-1.5 ml-4 space-y-1">
+                  <li>
+                    <span className="text-fg-subtle">Claude Code —</span>{" "}
+                    <CopyPath
+                      path={
+                        os === "windows"
+                          ? "%USERPROFILE%\\.claude\\projects"
+                          : "~/.claude/projects"
+                      }
+                    />
+                  </li>
+                  <li>
+                    <span className="text-fg-subtle">Kiro CLI —</span>{" "}
+                    <CopyPath
+                      path={
+                        os === "windows"
+                          ? "%USERPROFILE%\\.kiro\\sessions\\cli"
+                          : "~/.kiro/sessions/cli"
+                      }
+                    />
+                  </li>
+                </ul>
+              </li>
+              <li>
+                <strong>3.</strong> Click <strong>Select</strong>.
               </li>
             </ol>
           </Alert>
@@ -553,7 +611,7 @@ export function FolderConnect() {
                 id="connect-modal-title"
                 className="mt-4 text-xl font-semibold text-fg"
               >
-                Connecting Claude Code
+                Connecting {HARNESSES.find((h) => h.id === busy)?.name ?? "folder"}
               </h2>
               <p className="mt-1 text-sm text-fg-muted">
                 Indexing conversations locally. This stays on your machine —

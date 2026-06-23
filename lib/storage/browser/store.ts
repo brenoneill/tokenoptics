@@ -25,6 +25,7 @@ import type { Conversation, ConversationSummary, Message } from "../../types";
 
 function toSummary(row: ConversationRow): ConversationSummary {
   return {
+    harnessId: row.harnessId,
     projectId: row.projectId,
     sessionId: row.sessionId,
     title: row.title,
@@ -39,6 +40,7 @@ function toSummary(row: ConversationRow): ConversationSummary {
     totalOutputTokens: row.totalOutputTokens,
     totalCacheReadTokens: row.totalCacheReadTokens,
     totalCacheWriteTokens: row.totalCacheWriteTokens,
+    totalCredits: row.totalCredits,
     cacheHealth: row.cacheHealth ?? null,
   };
 }

@@ -42,7 +42,7 @@ export async function syncMount(opts: SyncOptions): Promise<SyncProgress> {
 
     const raw = await reader.readFile(session.locatorPath);
     if (raw == null) continue;
-    const conversation = harness.parse(raw, session);
+    const conversation = await harness.parse(raw, session, reader);
     if (!conversation) continue;
 
     const contentHash = await hashMessagesAsync(conversation.messages);
@@ -66,6 +66,7 @@ export async function syncMount(opts: SyncOptions): Promise<SyncProgress> {
         totalOutputTokens: conversation.totalOutputTokens,
         totalCacheReadTokens: conversation.totalCacheReadTokens,
         totalCacheWriteTokens: conversation.totalCacheWriteTokens,
+        totalCredits: conversation.totalCredits,
         cacheHealth,
         mtimeMs: session.mtimeMs ?? 0,
         contentHash,
