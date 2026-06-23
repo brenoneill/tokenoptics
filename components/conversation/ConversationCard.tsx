@@ -23,7 +23,13 @@ import {
   useComparisonSelection,
 } from "@/lib/comparisonCanvas/selectionStore";
 import { useComparisonCanvasEnabled } from "@/lib/preferences/comparisonCanvas";
-import { formatTokens, formatUSD } from "@/lib/pricing";
+import {
+  KIRO_CREDIT_RATE_USD,
+  formatCredits,
+  formatTokens,
+  formatUSD,
+  isCreditHarness,
+} from "@/lib/pricing";
 import { projectLabel } from "@/lib/conversation";
 import type { ConversationSummary } from "@/lib/types";
 
@@ -53,6 +59,10 @@ interface Props {
 export function ConversationCard({ conversation, hasChunks = false }: Props) {
   const href = `/conversations/view?p=${encodeURIComponent(conversation.projectId)}&s=${encodeURIComponent(conversation.sessionId)}`;
   const title = conversation.title;
+  const isCredits = isCreditHarness(conversation.harnessId);
+  const costTitle = isCredits
+    ? `${formatCredits(conversation.totalCredits ?? 0)} credits × $${KIRO_CREDIT_RATE_USD.overage}/credit (overage rate)`
+    : "Sum of per-message token cost";
   const canvasEnabled = useComparisonCanvasEnabled();
   const selection = useComparisonSelection();
   const inCanvas = isInComparison(selection, conversation.projectId, conversation.sessionId);
@@ -86,7 +96,7 @@ export function ConversationCard({ conversation, hasChunks = false }: Props) {
                   </Badge>
                 ) : null}
                 <Badge variant="accent" mono>
-                  {formatUSD(conversation.totalCost)}
+                  <span title={costTitle}>{formatUSD(conversation.totalCost)}</span>
                 </Badge>
               </div>
             }
@@ -103,18 +113,36 @@ export function ConversationCard({ conversation, hasChunks = false }: Props) {
             </div>
 
             <div className="mt-auto grid grid-cols-3 gap-3 border-t border-border-muted pt-3 text-xs">
-              <div>
-                <div className="text-fg-subtle">Output</div>
-                <div className="font-mono text-fg">
-                  {formatTokens(conversation.totalOutputTokens)}
+              {isCredits ? (
+                <div>
+                  <div className="text-fg-subtle">Credits</div>
+                  <div className="font-mono text-fg">
+                    {formatCredits(conversation.totalCredits ?? 0)}
+                  </div>
                 </div>
-              </div>
-              <div>
-                <div className="text-fg-subtle">Input</div>
-                <div className="font-mono text-fg">
-                  {formatTokens(conversation.totalInputTokens)}
+              ) : (
+                <div>
+                  <div className="text-fg-subtle">Output</div>
+                  <div className="font-mono text-fg">
+                    {formatTokens(conversation.totalOutputTokens)}
+                  </div>
                 </div>
-              </div>
+              )}
+              {isCredits ? (
+                <div>
+                  <div className="text-fg-subtle">Rate</div>
+                  <div className="font-mono text-fg">
+                    ${KIRO_CREDIT_RATE_USD.overage}/cr
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="text-fg-subtle">Input</div>
+                  <div className="font-mono text-fg">
+                    {formatTokens(conversation.totalInputTokens)}
+                  </div>
+                </div>
+              )}
               <div>
                 <div className="text-fg-subtle">Messages</div>
                 <div className="font-mono text-fg">{conversation.messageCount}</div>

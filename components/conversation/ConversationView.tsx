@@ -22,6 +22,9 @@ interface Props {
   messages: Message[];
   chunks: Chunk[];
   onChunksChanged: () => void;
+  // Credit-metered (Kiro) session. Drives credit-native stats even when this
+  // particular session recorded zero credits — keyed off harness, not amount.
+  isCredits?: boolean;
 }
 
 export function ConversationView({
@@ -30,6 +33,7 @@ export function ConversationView({
   messages,
   chunks,
   onChunksChanged,
+  isCredits = false,
 }: Props) {
   const [selectedChunkId, setSelectedChunkId] = useState<string | null>(null);
   const modelComparisonEnabled = useModelComparisonEnabled();
@@ -76,7 +80,12 @@ export function ConversationView({
     return messages.filter((m) => allowed.has(m.uuid));
   }, [messages, selectedChunk]);
 
-  const stats = useMemo(() => computeScopeStats(visibleMessages), [visibleMessages]);
+  const stats = useMemo(() => {
+    const s = computeScopeStats(visibleMessages);
+    // Force credit-native rendering for Kiro sessions even if zero credits were
+    // recorded — the harness, not the amount, determines the metering model.
+    return isCredits ? { ...s, isCredits: true } : s;
+  }, [visibleMessages, isCredits]);
 
   const select = (chunkId: string) => {
     setSelectedChunkId((prev) => (prev === chunkId ? null : chunkId));
@@ -94,7 +103,7 @@ export function ConversationView({
           stats={stats}
           color={activeColor}
         />
-        {modelComparisonEnabled ? (
+        {modelComparisonEnabled && !stats.isCredits ? (
           <ModelComparisonBar messages={visibleMessages} color={activeColor} />
         ) : null}
         <ChunkFilterBar
@@ -129,6 +138,7 @@ export function ConversationView({
                 removedLines={item.removedLines}
                 rewrittenLines={item.rewrittenLines}
                 totalCost={item.totalCost}
+                totalCredits={item.totalCredits}
               />
             );
           })}

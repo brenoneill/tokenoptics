@@ -19,7 +19,17 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import { Select, type SelectOption } from "@/components/ui/Select";
 import { projectLabel } from "@/lib/conversation";
-import { formatTokens, formatUSD } from "@/lib/pricing";
+import {
+  KIRO_CREDIT_RATE_USD,
+  KIRO_PLANS,
+  formatCredits,
+  formatTokens,
+  formatUSD,
+  kiroPlanCostForCredits,
+  isCreditHarness,
+  type KiroPlanId,
+} from "@/lib/pricing";
+import { setKiroPlan, useKiroPlan } from "@/lib/preferences/kiroPlan";
 import {
   setMinConversationCost,
   useMinConversationCost,
@@ -60,6 +70,9 @@ export interface ConversationEntry {
 interface Props {
   entries: ConversationEntry[];
   header?: ReactNode;
+  // Rendered after the sticky header, before the grid — for non-sticky panels
+  // like the Kiro credit portfolio.
+  beforeList?: ReactNode;
 }
 
 function branchKey(c: ConversationSummary): string {
@@ -67,7 +80,7 @@ function branchKey(c: ConversationSummary): string {
   return b && b.length > 0 ? b : NO_BRANCH;
 }
 
-export function ConversationsBrowser({ entries, header }: Props) {
+export function ConversationsBrowser({ entries, header, beforeList }: Props) {
   const [query, setQuery] = useState("");
   const [project, setProject] = useState<string>(ALL_PROJECTS);
   const [branch, setBranch] = useState<string>(ALL_BRANCHES);
@@ -75,6 +88,7 @@ export function ConversationsBrowser({ entries, header }: Props) {
   const [labelledOnly, setLabelledOnly] = useState(false);
   const [sort, setSort] = useState<SortKey>("recent");
   const minCost = useMinConversationCost();
+  const kiroPlan = useKiroPlan();
 
   const projectOptions = useMemo<SelectOption[]>(() => {
     const counts = new Map<string, number>();
@@ -156,13 +170,29 @@ export function ConversationsBrowser({ entries, header }: Props) {
     let cost = 0;
     let output = 0;
     let input = 0;
+    let credits = 0;
     for (const e of filtered) {
       cost += e.conversation.totalCost;
       output += e.conversation.totalOutputTokens;
       input += e.conversation.totalInputTokens;
+      credits += e.conversation.totalCredits ?? 0;
     }
-    return { cost, output, input };
+    return { cost, output, input, credits };
   }, [filtered]);
+
+  // Show the credit view when any filtered session comes from a credit-metered
+  // harness (Kiro) — keyed off harness, not amount, so a batch of zero-credit
+  // Kiro sessions still reads as credits rather than falling back to tokens.
+  // The plan-aware account cost (flat fee + overage) only makes sense across a
+  // whole billing month, so it's an account-level estimate, not a per-session sum.
+  const hasCredits = useMemo(
+    () => filtered.some((e) => isCreditHarness(e.conversation.harnessId)),
+    [filtered],
+  );
+  const planCost = useMemo(
+    () => kiroPlanCostForCredits(totals.credits, kiroPlan),
+    [totals.credits, kiroPlan],
+  );
 
   const isFiltered =
     query.trim().length > 0 ||
@@ -310,6 +340,8 @@ export function ConversationsBrowser({ entries, header }: Props) {
         </div>
       </div>
 
+      {beforeList}
+
       <ComparisonCanvasChip
         conversations={entries.map((e) => e.conversation)}
       />
@@ -333,9 +365,60 @@ export function ConversationsBrowser({ entries, header }: Props) {
               {entries.length === 1 ? "conversation" : "conversations"}
             </div>
             <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-              <TotalStat label="Cost" value={formatUSD(totals.cost)} accent />
-              <TotalStat label="Output" value={formatTokens(totals.output)} />
-              <TotalStat label="Input" value={formatTokens(totals.input)} />
+              {!hasCredits ? (
+                <TotalStat
+                  label="Cost"
+                  value={formatUSD(totals.cost)}
+                  accent
+                  title="Sum of per-session token cost."
+                />
+              ) : null}
+              {hasCredits ? (
+                <>
+                  <TotalStat
+                    label="Credits"
+                    value={formatCredits(totals.credits)}
+                    title="Total Kiro credits used across the filtered sessions"
+                  />
+                  <div className="flex items-baseline gap-2">
+                    {/* Inline plan picker so the assumed plan is visible and
+                        changeable right where the estimate appears (also in
+                        Settings → Kiro). */}
+                    <label className="flex items-baseline gap-1.5">
+                      <span className="text-xs uppercase tracking-wide text-fg-muted">
+                        Plan
+                      </span>
+                      <select
+                        value={kiroPlan}
+                        onChange={(e) => setKiroPlan(e.target.value as KiroPlanId)}
+                        aria-label="Kiro plan"
+                        className="rounded-md border border-border bg-bg-subtle px-2 py-0.5 font-mono text-sm text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+                      >
+                        {(Object.keys(KIRO_PLANS) as KiroPlanId[]).map((id) => (
+                          <option key={id} value={id}>
+                            {KIRO_PLANS[id].name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <TotalStat
+                      label="est. bill"
+                      value={formatUSD(planCost.total)}
+                      accent
+                      title={
+                        kiroPlan === "overage-only"
+                          ? `No flat plan: all ${formatCredits(totals.credits)} credits × $${KIRO_CREDIT_RATE_USD.overage} overage = ${formatUSD(planCost.total)}.`
+                          : `Your estimated bill on the ${KIRO_PLANS[kiroPlan].name} plan: $${planCost.monthlyFee}/mo flat fee + ${formatCredits(planCost.overageCredits)} credits over the ${KIRO_PLANS[kiroPlan].includedCredits.toLocaleString()} allotment × $${KIRO_CREDIT_RATE_USD.overage} = ${formatUSD(planCost.overageCost)} overage. Per billing month.`
+                      }
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <TotalStat label="Output" value={formatTokens(totals.output)} />
+                  <TotalStat label="Input" value={formatTokens(totals.input)} />
+                </>
+              )}
             </div>
           </div>
         </>
@@ -408,14 +491,16 @@ function TotalStat({
   label,
   value,
   accent = false,
+  title,
 }: {
   label: string;
   value: string;
   accent?: boolean;
+  title?: string;
 }) {
   const color = accent ? "text-accent" : "text-fg";
   return (
-    <div className="flex items-baseline gap-2">
+    <div className="flex items-baseline gap-2" title={title}>
       <span className="text-xs uppercase tracking-wide text-fg-muted">
         {label}
       </span>

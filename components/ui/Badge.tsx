@@ -24,6 +24,7 @@ interface BadgeProps {
   variant?: Variant;
   mono?: boolean;
   className?: string;
+  title?: string;
 }
 
 export function Badge({
@@ -31,9 +32,11 @@ export function Badge({
   variant = "neutral",
   mono = false,
   className = "",
+  title,
 }: BadgeProps) {
   return (
     <span
+      title={title}
       className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${
         mono ? "font-mono" : ""
       } ${VARIANTS[variant]} ${className}`}

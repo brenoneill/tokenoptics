@@ -12,12 +12,16 @@ import { StickyHeader } from "@/components/ui/StickyHeader";
 import { CacheRecommendations } from "@/components/analyze/CacheRecommendations";
 import { CacheSummary } from "@/components/analyze/CacheSummary";
 import { CacheTrajectory } from "@/components/analyze/CacheTrajectory";
+import { CreditSummary } from "@/components/analyze/CreditSummary";
+import { CreditTrajectory } from "@/components/analyze/CreditTrajectory";
 import { RoutingAnalysisPanel } from "@/components/analyze/RoutingAnalysisPanel";
 import { ConversationDetailSkeleton } from "@/components/conversation/ConversationDetailSkeleton";
 import { ConversationView } from "@/components/conversation/ConversationView";
 import { ExportDialog } from "@/components/conversation/ExportDialog";
 import { getApiKey } from "@/lib/analyze/anthropic";
 import { computeCacheReport } from "@/lib/analyze/cache";
+import { computeCreditReport } from "@/lib/analyze/credits";
+import { KIRO_CREDIT_RATE_USD, isCreditHarness } from "@/lib/pricing";
 import { submitCacheResults, submitRoutingResults } from "@/lib/analyze/formspree";
 import type { QualityRunRecord } from "@/lib/analyze/quality";
 import { extractPromptSpans, estimateClassifierCost } from "@/lib/analyze/session";
@@ -43,7 +47,7 @@ interface LoadedState {
   estimatedCost: number;
 }
 
-type TabId = "conversation" | "cache" | "analysis";
+type TabId = "conversation" | "cache" | "credits" | "analysis";
 
 function genRunId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -223,18 +227,30 @@ function ConversationDetail() {
   }
 
   const { conversation, chunks, promptCount, estimatedCost } = state;
+  // Kiro CLI sessions meter in credits, not tokens. Token/cache-centric views
+  // (cache & context report, Anthropic per-token routing analysis) are
+  // meaningless for them — every token field is zero — so we hide them. Keyed
+  // off the harness, not the credit amount: a short Kiro session may record
+  // zero credits but is still credit-metered, never token-metered.
+  const isCredits = isCreditHarness(conversation.harnessId);
   // Routing analysis hits the Anthropic API, so its entry point only makes
-  // sense when a key is configured. The cache report is pure compute over
-  // usage fields — no key needed — so its tab always renders.
-  const hasApiKey = getApiKey() !== null;
+  // sense when a key is configured (and never for credit-based sessions).
+  const hasApiKey = getApiKey() !== null && !isCredits;
   const cacheReport = computeCacheReport(conversation.messages);
+  const creditReport = isCredits
+    ? computeCreditReport(conversation.messages)
+    : null;
   // The "Analysis" tab exists once a run has been started, is in flight, or
   // failed — i.e. there is something to show beyond the run button.
   const analysisStarted = run !== null || running || runError !== null;
 
   const tabs: { id: TabId; label: string }[] = [
     { id: "conversation", label: "Conversation" },
-    { id: "cache", label: "Cache & context" },
+    // Credit sessions (Kiro) get a credit-native "Credits" tab; token-based
+    // sessions get the cache/context analysis. They're mutually exclusive.
+    ...(isCredits
+      ? [{ id: "credits" as const, label: "Credits" }]
+      : [{ id: "cache" as const, label: "Cache & context" }]),
     ...(analysisStarted
       ? [{ id: "analysis" as const, label: "Analysis" }]
       : []),
@@ -327,6 +343,7 @@ function ConversationDetail() {
             messages={conversation.messages}
             chunks={chunks}
             onChunksChanged={reloadChunks}
+            isCredits={isCredits}
           />
         ) : null}
 
@@ -344,6 +361,24 @@ function ConversationDetail() {
               <CacheSummary report={cacheReport} />
               <CacheTrajectory report={cacheReport} />
               <CacheRecommendations recommendations={cacheReport.recommendations} />
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "credits" && creditReport ? (
+          <section>
+            <div className="mb-4">
+              <h2 className="text-lg font-medium text-fg">Credits</h2>
+              <p className="mt-1 text-sm text-fg-muted">
+                Kiro meters this session in credits, not tokens. Below is how
+                credits were spent across the session — per-turn burn, the
+                cumulative curve, and which models consumed them. Dollar figures
+                use the ${KIRO_CREDIT_RATE_USD.overage}/credit overage rate.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <CreditSummary report={creditReport} />
+              <CreditTrajectory report={creditReport} />
             </div>
           </section>
         ) : null}

@@ -33,8 +33,15 @@ export interface Harness {
   discover(reader: FolderReader): AsyncIterable<DiscoveredSession>;
 
   // Parse a session file's raw contents. Returns null if the file doesn't
-  // contain renderable content.
-  parse(raw: string, locator: SessionLocator): Conversation | null;
+  // contain renderable content. May be async and read sibling files via the
+  // optional reader — Kiro CLI splits the message stream (.jsonl) from per-turn
+  // usage/credit metadata (.json), so its parser fetches the sibling file.
+  // Token-based harnesses (Claude Code) ignore the reader and stay synchronous.
+  parse(
+    raw: string,
+    locator: SessionLocator,
+    reader?: FolderReader,
+  ): Conversation | null | Promise<Conversation | null>;
 
   // Direct lookup of a known (projectId, sessionId) without walking the tree.
   // Harnesses whose layout is deterministic (e.g. Claude Code) implement this;

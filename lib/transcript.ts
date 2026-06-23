@@ -25,6 +25,8 @@ export interface FoldItem {
   removedLines: number;
   rewrittenLines: number;
   totalCost: number;
+  // Kiro credit sessions: credits spent within this fold (0 for token-based).
+  totalCredits: number;
 }
 
 export type TranscriptItem = PromptItem | FoldItem;
@@ -80,6 +82,7 @@ function emptyFoldAccumulator() {
     removedLines: 0,
     rewrittenLines: 0,
     totalCost: 0,
+    totalCredits: 0,
   };
 }
 
@@ -91,6 +94,7 @@ function addMessageToFold(
   isTrigger: boolean,
 ): void {
   if (typeof message.cost === "number") acc.totalCost += message.cost;
+  if (typeof message.usage?.credits === "number") acc.totalCredits += message.usage.credits;
 
   const diffs = diffBlocksFor(message);
   if (diffs.length > 0) {
